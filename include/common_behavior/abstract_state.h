@@ -99,6 +99,10 @@ public:
         factoryFunctionRegistry[name] = classFactoryFunction;
     }
 
+    const map<string, function<StateBase<TYPE_BUF_LO, TYPE_BUF_HI>*(void)> >& getStates() const {
+        return factoryFunctionRegistry;
+    }
+
     static StateFactory* Instance()
     {
         static StateFactory factory;

@@ -104,6 +104,10 @@ public:
         factoryFunctionRegistry[name] = classFactoryFunction;
     }
 
+    const map<string, function<BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI>*(void)> >& getBehaviors() const {
+        return factoryFunctionRegistry;
+    }
+
     static BehaviorFactory* Instance()
     {
         static BehaviorFactory factory;
