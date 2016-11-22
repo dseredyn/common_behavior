@@ -37,8 +37,6 @@
 #include <vector>
 #include <string>
 
-#include "Eigen/Dense"
-
 #include "common_behavior/abstract_behavior.h"
 #include "common_behavior/abstract_state.h"
 
@@ -49,8 +47,6 @@ template <
     class ContainerHiCommand >
 class MasterComponent: public RTT::TaskContext {
 public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
     explicit MasterComponent(const std::string &name);
 
     bool configureHook();
