@@ -307,7 +307,7 @@ void MasterComponent<InterfaceLoStatus, ContainerHiCommand >::updateHook() {
     int id_faulty_submodule;
 
     //
-    // read HW status (from previous iteration)
+    // read status (from previous iteration)
     //
     status_ports_in_.readPorts();
     status_ports_in_.convertToROS(status_in_);
