@@ -34,15 +34,13 @@
 
 #include "rtt/RTT.hpp"
 
-//#include "common_interfaces/interface_ports.h"
-
 template <class TYPE_BUF_LO, class TYPE_BUF_HI>
 class StateBase {
 public:
 
     virtual bool checkInitialCondition(
-            const TYPE_BUF_LO& buf_lo, //const interface_ports::ContainerOuter &buf_lo_info,
-            const TYPE_BUF_HI& buf_hi, //const interface_ports::ContainerOuter &buf_hi_info,
+            const TYPE_BUF_LO& buf_lo,
+            const TYPE_BUF_HI& buf_hi,
             const std::vector<RTT::TaskContext*> &components,
             const std::string& prev_state_name,
             bool in_error) const = 0;
@@ -113,13 +111,20 @@ public:
 template<class TYPE_BUF_LO, class TYPE_BUF_HI, class T>
 class StateRegistrar {
 public:
-    StateRegistrar(string name)
+    StateRegistrar()
     {
+        std::string name;
+        {
+            T sample;
+            name = sample.getStateName();
+        }
         // register the class factory function 
         StateFactory<TYPE_BUF_LO, TYPE_BUF_HI >::Instance()->RegisterFactoryFunction(name,
                 [](void) -> StateBase<TYPE_BUF_LO, TYPE_BUF_HI > * { return new T();});
     }
 };
+
+#define REGISTER_STATE( SUBSYSTEM_INPUT, SUBSYSTEM_OUTPUT, STATE_CLASS ) static StateRegistrar<SUBSYSTEM_INPUT, SUBSYSTEM_OUTPUT, STATE_CLASS> registrar
 
 #endif  // __ABSTRACT_STATE_H__
 

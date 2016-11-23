@@ -34,20 +34,18 @@
 
 #include "rtt/RTT.hpp"
 
-//#include "common_interfaces/interface_ports.h"
-
 template <class TYPE_BUF_LO, class TYPE_BUF_HI>
 class BehaviorBase {
 public:
 
     virtual bool checkErrorCondition(
-            const TYPE_BUF_LO& buf_lo, //const interface_ports::ContainerOuter &buf_lo_info,
-            const TYPE_BUF_HI& buf_hi, //const interface_ports::ContainerOuter &buf_hi_info,
+            const TYPE_BUF_LO& buf_lo,
+            const TYPE_BUF_HI& buf_hi,
             const std::vector<RTT::TaskContext*> &components) const = 0;
 
     virtual bool checkStopCondition(
-            const TYPE_BUF_LO& buf_lo, //const interface_ports::ContainerOuter &buf_lo_info,
-            const TYPE_BUF_HI& buf_hi, //const interface_ports::ContainerOuter &buf_hi_info,
+            const TYPE_BUF_LO& buf_lo,
+            const TYPE_BUF_HI& buf_hi,
             const std::vector<RTT::TaskContext*> &components) const = 0;
 
     const std::string& getName() const {
@@ -118,13 +116,21 @@ public:
 template<class TYPE_BUF_LO, class TYPE_BUF_HI, class T>
 class BehaviorRegistrar {
 public:
-    BehaviorRegistrar(string name)
+    BehaviorRegistrar()
     {
+        std::string name;
+        {
+            T sample;
+            name = sample.getName();
+        }
+
         // register the class factory function 
         BehaviorFactory<TYPE_BUF_LO, TYPE_BUF_HI >::Instance()->RegisterFactoryFunction(name,
                 [](void) -> BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI > * { return new T();});
     }
 };
+
+#define REGISTER_BEHAVIOR( SUBSYSTEM_INPUT, SUBSYSTEM_OUTPUT, STATE_CLASS ) static BehaviorRegistrar<SUBSYSTEM_INPUT, SUBSYSTEM_OUTPUT, STATE_CLASS> registrar
 
 #endif  // __ABSTRACT_BEHAVIOR_H__
 
