@@ -42,9 +42,7 @@
 
 using namespace RTT;
 
-template <
-    template <template <typename Type> class RTTport> class InterfaceLoStatus,
-    class ContainerHiCommand >
+template <class ContainerLoStatus, class ContainerHiCommand >
 class MasterComponent: public RTT::TaskContext {
 public:
     explicit MasterComponent(const std::string &name);
@@ -60,17 +58,14 @@ public:
     std::string getDiag();
 
 private:
-    typedef InterfaceLoStatus<RTT::InputPort > InterfaceLoStatusInput;
-    typedef typename InterfaceLoStatusInput::Container ContainerLoStatus;
-
     // parameters
     std::vector<std::string > state_names_;
     std::string initial_state_name_;
 
     std::vector<std::string > behavior_names_;
 
-    typename InterfaceLoStatusInput::Container status_in_;
-    InterfaceLoStatusInput status_ports_in_;
+    ContainerLoStatus status_in_;
+    RTT::InputPort<ContainerLoStatus > port_status_in_;
 
     ContainerHiCommand cmd_in_;
     RTT::InputPort<ContainerHiCommand > port_command_in_;
@@ -100,16 +95,14 @@ private:
     bool diag_cmd_in_received_;
 };
 
-template <
-    template <template <typename Type> class RTTport> class InterfaceLoStatus,
-    class ContainerHiCommand >
-MasterComponent<InterfaceLoStatus, ContainerHiCommand >::MasterComponent(const std::string &name) :
+template <class ContainerLoStatus, class ContainerHiCommand >
+MasterComponent<ContainerLoStatus, ContainerHiCommand >::MasterComponent(const std::string &name) :
     TaskContext(name, PreOperational),
-    status_ports_in_(*this),
     diag_current_state_id_(0),
     diag_cmd_in_received_(false)
 {
     this->ports()->addPort("command_INPORT", port_command_in_);
+    this->ports()->addPort("status_INPORT", port_status_in_);
     this->ports()->addPort("status_test_OUTPORT", port_status_test_out_);
 
     this->addOperation("getDiag", &MasterComponent::getDiag, this, RTT::ClientThread);
@@ -118,10 +111,8 @@ MasterComponent<InterfaceLoStatus, ContainerHiCommand >::MasterComponent(const s
     addProperty("initial_state_name", initial_state_name_);
 }
 
-template <
-    template <template <typename Type> class RTTport> class InterfaceLoStatus,
-    class ContainerHiCommand >
-std::string MasterComponent<InterfaceLoStatus, ContainerHiCommand >::getDiag() {
+template <class ContainerLoStatus, class ContainerHiCommand >
+std::string MasterComponent<ContainerLoStatus, ContainerHiCommand >::getDiag() {
 // this method may not be RT-safe
     int state_id = diag_current_state_id_;
     if (state_id < 0 || state_id >= states_.size()) {
@@ -131,10 +122,8 @@ std::string MasterComponent<InterfaceLoStatus, ContainerHiCommand >::getDiag() {
     return "state: " + states_[state_id]->getStateName() + ", behavior: " + states_[state_id]->getBehaviorName() + ", " + (diag_cmd_in_received_?"<receiving commands>":"<no commands>");
 }
 
-template <
-    template <template <typename Type> class RTTport> class InterfaceLoStatus,
-    class ContainerHiCommand >
-bool MasterComponent<InterfaceLoStatus, ContainerHiCommand >::configureHook() {
+template <class ContainerLoStatus, class ContainerHiCommand >
+bool MasterComponent<ContainerLoStatus, ContainerHiCommand >::configureHook() {
     Logger::In in("MasterComponent::configureHook");
 
     for (auto it = StateFactory<ContainerLoStatus, ContainerHiCommand >::Instance()->getStates().begin();
@@ -282,25 +271,19 @@ bool MasterComponent<InterfaceLoStatus, ContainerHiCommand >::configureHook() {
     return true;
 }
 
-template <
-    template <template <typename Type> class RTTport> class InterfaceLoStatus,
-    class ContainerHiCommand >
-bool MasterComponent<InterfaceLoStatus, ContainerHiCommand >::startHook() {
+template <class ContainerLoStatus, class ContainerHiCommand >
+bool MasterComponent<ContainerLoStatus, ContainerHiCommand >::startHook() {
     state_switch_ = true;
     packet_counter_ = 1;
     return true;
 }
 
-template <
-    template <template <typename Type> class RTTport> class InterfaceLoStatus,
-    class ContainerHiCommand >
-void MasterComponent<InterfaceLoStatus, ContainerHiCommand >::stopHook() {
+template <class ContainerLoStatus, class ContainerHiCommand >
+void MasterComponent<ContainerLoStatus, ContainerHiCommand >::stopHook() {
 }
 
-template <
-    template <template <typename Type> class RTTport> class InterfaceLoStatus,
-    class ContainerHiCommand >
-void MasterComponent<InterfaceLoStatus, ContainerHiCommand >::updateHook() {
+template <class ContainerLoStatus, class ContainerHiCommand >
+void MasterComponent<ContainerLoStatus, ContainerHiCommand >::updateHook() {
     Logger::In in("MasterComponent::updateHook");
 
     int id_faulty_module;
@@ -309,8 +292,7 @@ void MasterComponent<InterfaceLoStatus, ContainerHiCommand >::updateHook() {
     //
     // read status (from previous iteration)
     //
-    status_ports_in_.readPorts();
-    status_ports_in_.convertToROS(status_in_);
+    port_status_in_.read(status_in_);
 
     //
     // read commands
