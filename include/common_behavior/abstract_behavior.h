@@ -28,24 +28,25 @@
 #ifndef __ABSTRACT_BEHAVIOR_H__
 #define __ABSTRACT_BEHAVIOR_H__
 
+#include "common_behavior/input_data.h"
+
 #include <map>
 #include <vector>
 #include <string>
 
 #include "rtt/RTT.hpp"
 
-template <class TYPE_BUF_LO, class TYPE_BUF_HI>
+namespace common_behavior {
+
 class BehaviorBase {
 public:
 
     virtual bool checkErrorCondition(
-            const TYPE_BUF_LO& buf_lo,
-            const TYPE_BUF_HI& buf_hi,
+            const InputData& in_data,
             const std::vector<RTT::TaskContext*> &components) const = 0;
 
     virtual bool checkStopCondition(
-            const TYPE_BUF_LO& buf_lo,
-            const TYPE_BUF_HI& buf_hi,
+            const InputData& in_data,
             const std::vector<RTT::TaskContext*> &components) const = 0;
 
     const std::string& getName() const {
@@ -70,18 +71,17 @@ private:
     std::string name_;
 };
 
-template <class TYPE_BUF_LO, class TYPE_BUF_HI>
 class BehaviorFactory
 {
 private:
-    map<string, function<BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI>*(void)> > factoryFunctionRegistry;
+    map<string, function<BehaviorBase*(void)> > factoryFunctionRegistry;
 
     BehaviorFactory() {}
 
 public:
-    shared_ptr<BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI> > Create(string name)
+    shared_ptr<BehaviorBase > Create(string name)
     {
-        BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI > * instance = nullptr;
+        BehaviorBase * instance = nullptr;
 
         // find name in the registry and call factory method.
         auto it = factoryFunctionRegistry.find(name);
@@ -90,19 +90,19 @@ public:
 
         // wrap instance in a shared ptr and return
         if(instance != nullptr)
-            return std::shared_ptr<BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI > >(instance);
+            return std::shared_ptr<BehaviorBase >(instance);
         else
             return nullptr;
     }
 
     void RegisterFactoryFunction(string name,
-    function<BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI >*(void)> classFactoryFunction)
+    function<BehaviorBase*(void)> classFactoryFunction)
     {
         // register the class factory function
         factoryFunctionRegistry[name] = classFactoryFunction;
     }
 
-    const map<string, function<BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI>*(void)> >& getBehaviors() const {
+    const map<string, function<BehaviorBase*(void)> >& getBehaviors() const {
         return factoryFunctionRegistry;
     }
 
@@ -113,7 +113,7 @@ public:
     }
 };
 
-template<class TYPE_BUF_LO, class TYPE_BUF_HI, class T>
+template<class T>
 class BehaviorRegistrar {
 public:
     BehaviorRegistrar()
@@ -125,12 +125,14 @@ public:
         }
 
         // register the class factory function 
-        BehaviorFactory<TYPE_BUF_LO, TYPE_BUF_HI >::Instance()->RegisterFactoryFunction(name,
-                [](void) -> BehaviorBase<TYPE_BUF_LO, TYPE_BUF_HI > * { return new T();});
+        BehaviorFactory::Instance()->RegisterFactoryFunction(name,
+                [](void) -> BehaviorBase * { return new T();});
     }
 };
 
-#define REGISTER_BEHAVIOR( SUBSYSTEM_INPUT, SUBSYSTEM_OUTPUT, STATE_CLASS ) static BehaviorRegistrar<SUBSYSTEM_INPUT, SUBSYSTEM_OUTPUT, STATE_CLASS> registrar
+#define REGISTER_BEHAVIOR( STATE_CLASS ) static common_behavior::BehaviorRegistrar<STATE_CLASS > registrar
+
+};  // namespace common_behavior
 
 #endif  // __ABSTRACT_BEHAVIOR_H__
 

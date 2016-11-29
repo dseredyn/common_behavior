@@ -28,19 +28,21 @@
 #ifndef __ABSTRACT_STATE_H__
 #define __ABSTRACT_STATE_H__
 
+#include "common_behavior/input_data.h"
+
 #include <map>
 #include <vector>
 #include <string>
 
 #include "rtt/RTT.hpp"
 
-template <class TYPE_BUF_LO, class TYPE_BUF_HI>
+namespace common_behavior {
+
 class StateBase {
 public:
 
     virtual bool checkInitialCondition(
-            const TYPE_BUF_LO& buf_lo,
-            const TYPE_BUF_HI& buf_hi,
+            const InputData& in_data,
             const std::vector<RTT::TaskContext*> &components,
             const std::string& prev_state_name,
             bool in_error) const = 0;
@@ -65,18 +67,17 @@ private:
     std::string behavior_name_;
 };
 
-template <class TYPE_BUF_LO, class TYPE_BUF_HI>
 class StateFactory
 {
 private:
-    map<string, function<StateBase<TYPE_BUF_LO, TYPE_BUF_HI>*(void)> > factoryFunctionRegistry;
+    map<string, function<StateBase*(void)> > factoryFunctionRegistry;
 
     StateFactory() {}
 
 public:
-    shared_ptr<StateBase<TYPE_BUF_LO, TYPE_BUF_HI> > Create(string name)
+    shared_ptr<StateBase > Create(string name)
     {
-        StateBase<TYPE_BUF_LO, TYPE_BUF_HI > * instance = nullptr;
+        StateBase* instance = nullptr;
 
         // find name in the registry and call factory method.
         auto it = factoryFunctionRegistry.find(name);
@@ -85,19 +86,19 @@ public:
 
         // wrap instance in a shared ptr and return
         if(instance != nullptr)
-            return std::shared_ptr<StateBase<TYPE_BUF_LO, TYPE_BUF_HI > >(instance);
+            return std::shared_ptr<StateBase >(instance);
         else
             return nullptr;
     }
 
     void RegisterFactoryFunction(string name,
-    function<StateBase<TYPE_BUF_LO, TYPE_BUF_HI >*(void)> classFactoryFunction)
+    function<StateBase*(void)> classFactoryFunction)
     {
         // register the class factory function
         factoryFunctionRegistry[name] = classFactoryFunction;
     }
 
-    const map<string, function<StateBase<TYPE_BUF_LO, TYPE_BUF_HI>*(void)> >& getStates() const {
+    const map<string, function<StateBase*(void)> >& getStates() const {
         return factoryFunctionRegistry;
     }
 
@@ -108,7 +109,7 @@ public:
     }
 };
 
-template<class TYPE_BUF_LO, class TYPE_BUF_HI, class T>
+template<class T>
 class StateRegistrar {
 public:
     StateRegistrar()
@@ -119,12 +120,14 @@ public:
             name = sample.getStateName();
         }
         // register the class factory function 
-        StateFactory<TYPE_BUF_LO, TYPE_BUF_HI >::Instance()->RegisterFactoryFunction(name,
-                [](void) -> StateBase<TYPE_BUF_LO, TYPE_BUF_HI > * { return new T();});
+        StateFactory::Instance()->RegisterFactoryFunction(name,
+                [](void) -> StateBase * { return new T();});
     }
 };
 
-#define REGISTER_STATE( SUBSYSTEM_INPUT, SUBSYSTEM_OUTPUT, STATE_CLASS ) static StateRegistrar<SUBSYSTEM_INPUT, SUBSYSTEM_OUTPUT, STATE_CLASS> registrar
+#define REGISTER_STATE( STATE_CLASS ) static common_behavior::StateRegistrar<STATE_CLASS > registrar
+
+};  // namespace common_behavior
 
 #endif  // __ABSTRACT_STATE_H__
 

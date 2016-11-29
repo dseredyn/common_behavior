@@ -25,9 +25,6 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef MASTER_COMPONENT_H__
-#define MASTER_COMPONENT_H__
-
 #include <rtt/RTT.hpp>
 #include <rtt/Component.hpp>
 #include <rtt/Logger.hpp>
@@ -39,10 +36,11 @@
 
 #include "common_behavior/abstract_behavior.h"
 #include "common_behavior/abstract_state.h"
+#include "common_behavior/input_data.h"
+#include "common_behavior/master_service_requester.h"
 
 using namespace RTT;
 
-template <class ContainerLoStatus, class ContainerHiCommand >
 class MasterComponent: public RTT::TaskContext {
 public:
     explicit MasterComponent(const std::string &name);
@@ -64,18 +62,12 @@ private:
 
     std::vector<std::string > behavior_names_;
 
-    ContainerLoStatus status_in_;
-    RTT::InputPort<ContainerLoStatus > port_status_in_;
-
-    ContainerHiCommand cmd_in_;
-    RTT::InputPort<ContainerHiCommand > port_command_in_;
-
     RTT::OutputPort<uint32_t> port_status_test_out_;
 
-    std::vector<std::shared_ptr<BehaviorBase<ContainerLoStatus, ContainerHiCommand> > > behaviors_;
+    std::vector<std::shared_ptr<common_behavior::BehaviorBase > > behaviors_;
 
-    std::vector<std::shared_ptr<StateBase<ContainerLoStatus, ContainerHiCommand> > > states_;
-    std::shared_ptr<StateBase<ContainerLoStatus, ContainerHiCommand> > current_state_;
+    std::vector<std::shared_ptr<common_behavior::StateBase > > states_;
+    std::shared_ptr<common_behavior::StateBase > current_state_;
 
     // pointer to conman scheme TaskContext
     TaskContext *scheme_;
@@ -93,16 +85,15 @@ private:
 
     int diag_current_state_id_;
     bool diag_cmd_in_received_;
+
+    boost::shared_ptr<common_behavior::MasterServiceRequester > master_service_;
 };
 
-template <class ContainerLoStatus, class ContainerHiCommand >
-MasterComponent<ContainerLoStatus, ContainerHiCommand >::MasterComponent(const std::string &name) :
+MasterComponent::MasterComponent(const std::string &name) :
     TaskContext(name, PreOperational),
     diag_current_state_id_(0),
     diag_cmd_in_received_(false)
 {
-    this->ports()->addPort("command_INPORT", port_command_in_);
-    this->ports()->addPort("status_INPORT", port_status_in_);
     this->ports()->addPort("status_test_OUTPORT", port_status_test_out_);
 
     this->addOperation("getDiag", &MasterComponent::getDiag, this, RTT::ClientThread);
@@ -111,30 +102,35 @@ MasterComponent<ContainerLoStatus, ContainerHiCommand >::MasterComponent(const s
     addProperty("initial_state_name", initial_state_name_);
 }
 
-template <class ContainerLoStatus, class ContainerHiCommand >
-std::string MasterComponent<ContainerLoStatus, ContainerHiCommand >::getDiag() {
+std::string MasterComponent::getDiag() {
 // this method may not be RT-safe
     int state_id = diag_current_state_id_;
     if (state_id < 0 || state_id >= states_.size()) {
         return "";
     }
     
-    return "state: " + states_[state_id]->getStateName() + ", behavior: " + states_[state_id]->getBehaviorName() + ", " + (diag_cmd_in_received_?"<receiving commands>":"<no commands>");
+    return "state: " + states_[state_id]->getStateName() + ", behavior: " + states_[state_id]->getBehaviorName() +
+            ", " + (diag_cmd_in_received_?"<receiving commands>":"<no commands>");
 }
 
-template <class ContainerLoStatus, class ContainerHiCommand >
-bool MasterComponent<ContainerLoStatus, ContainerHiCommand >::configureHook() {
+bool MasterComponent::configureHook() {
     Logger::In in("MasterComponent::configureHook");
 
-    for (auto it = StateFactory<ContainerLoStatus, ContainerHiCommand >::Instance()->getStates().begin();
-        it != StateFactory<ContainerLoStatus, ContainerHiCommand >::Instance()->getStates().end(); ++it)
+    master_service_ = this->getProvider<common_behavior::MasterServiceRequester >("master");
+    if (!master_service_) {
+        RTT::log(RTT::Error) << "Unable to load common_behavior::MasterService" << RTT::endlog();
+        return false;
+    }
+
+    for (auto it = common_behavior::StateFactory::Instance()->getStates().begin();
+        it != common_behavior::StateFactory::Instance()->getStates().end(); ++it)
     {
         Logger::log() << Logger::Info << "state: " << it->first << Logger::endl;
     }
 
     // retrieve states list
     for (int i = 0; i < state_names_.size(); ++i) {
-        auto b_ptr = StateFactory<ContainerLoStatus, ContainerHiCommand >::Instance()->Create( state_names_[i] );
+        auto b_ptr = common_behavior::StateFactory::Instance()->Create( state_names_[i] );
         if (b_ptr) {
             states_.push_back(b_ptr);
         }
@@ -161,7 +157,7 @@ bool MasterComponent<ContainerLoStatus, ContainerHiCommand >::configureHook() {
 
     // retrieve behaviors list
     for (int i = 0; i < behavior_names_.size(); ++i) {
-        auto b_ptr = BehaviorFactory<ContainerLoStatus, ContainerHiCommand >::Instance()->Create( behavior_names_[i] );
+        auto b_ptr = common_behavior::BehaviorFactory::Instance()->Create( behavior_names_[i] );
         if (b_ptr) {
             behaviors_.push_back(b_ptr);
         }
@@ -271,41 +267,30 @@ bool MasterComponent<ContainerLoStatus, ContainerHiCommand >::configureHook() {
     return true;
 }
 
-template <class ContainerLoStatus, class ContainerHiCommand >
-bool MasterComponent<ContainerLoStatus, ContainerHiCommand >::startHook() {
+bool MasterComponent::startHook() {
     state_switch_ = true;
     packet_counter_ = 1;
     return true;
 }
 
-template <class ContainerLoStatus, class ContainerHiCommand >
-void MasterComponent<ContainerLoStatus, ContainerHiCommand >::stopHook() {
+void MasterComponent::stopHook() {
 }
 
-template <class ContainerLoStatus, class ContainerHiCommand >
-void MasterComponent<ContainerLoStatus, ContainerHiCommand >::updateHook() {
+void MasterComponent::updateHook() {
     Logger::In in("MasterComponent::updateHook");
 
     int id_faulty_module;
     int id_faulty_submodule;
 
-    //
-    // read status (from previous iteration)
-    //
-    port_status_in_.read(status_in_);
+    common_behavior::InputData in_data;
 
-    //
-    // read commands
-    //
-    bool cmd_in_received = (port_command_in_.read(cmd_in_) == NewData);
-    if (!cmd_in_received) {
-        // set msg to default value (all fields are 0, false, etc.)
-        cmd_in_ = ContainerHiCommand();
-    }
-    diag_cmd_in_received_ = cmd_in_received;
+    master_service_->readPorts(in_data);
+
+// TODO:
+//    diag_cmd_in_received_ = cmd_in_received;
 
     // get current behavior
-    std::shared_ptr<BehaviorBase<ContainerLoStatus, ContainerHiCommand> > current_behavior;
+    std::shared_ptr<common_behavior::BehaviorBase > current_behavior;
     for (int i = 0; i < behaviors_.size(); ++i) {
         if (current_state_->getBehaviorName() == behaviors_[i]->getName()) {
             current_behavior = behaviors_[i];
@@ -317,12 +302,12 @@ void MasterComponent<ContainerLoStatus, ContainerHiCommand >::updateHook() {
     // check error condition
     //
     bool pred_err = false;
-    pred_err = current_behavior->checkErrorCondition(status_in_, cmd_in_, scheme_peers_);
+    pred_err = current_behavior->checkErrorCondition(in_data, scheme_peers_);
 
     if (pred_err) {
         int next_state_index = -1;
         for (int i = 0; i < states_.size(); ++i) {
-            if ( states_[i]->checkInitialCondition(status_in_, cmd_in_, scheme_peers_, current_state_->getStateName(), true) ) {
+            if ( states_[i]->checkInitialCondition(in_data, scheme_peers_, current_state_->getStateName(), true) ) {
                 if (next_state_index == -1) {
                     next_state_index = i;
                 }
@@ -357,12 +342,12 @@ void MasterComponent<ContainerLoStatus, ContainerHiCommand >::updateHook() {
         // check stop condition
         //
         bool pred_stop = false;
-        pred_stop = current_behavior->checkStopCondition(status_in_, cmd_in_, scheme_peers_);
+        pred_stop = current_behavior->checkStopCondition(in_data, scheme_peers_);
 
         if (pred_stop) {
             int next_state_index = -1;
             for (int i = 0; i < states_.size(); ++i) {
-                if ( states_[i]->checkInitialCondition(status_in_, cmd_in_, scheme_peers_, current_state_->getStateName(), false) ) {
+                if ( states_[i]->checkInitialCondition(in_data, scheme_peers_, current_state_->getStateName(), false) ) {
                     if (next_state_index == -1) {
                         next_state_index = i;
                     }
@@ -416,5 +401,7 @@ void MasterComponent<ContainerLoStatus, ContainerHiCommand >::updateHook() {
     port_status_test_out_.write(packet_counter_);
 }
 
-#endif  // MASTER_COMPONENT_H__
+ORO_LIST_COMPONENT_TYPE(MasterComponent)
+
+ORO_CREATE_COMPONENT_LIBRARY()
 
