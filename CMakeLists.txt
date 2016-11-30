@@ -6,10 +6,8 @@ project(common_behavior)
 find_package(catkin REQUIRED COMPONENTS
   rtt_ros
   diagnostic_msgs
-  velma_core_cs_task_cs_msgs
   eigen_conversions
   kdl_conversions cmake_modules
-  common_interfaces
   )
 
 find_package(OROCOS-RTT REQUIRED COMPONENTS rtt-scripting rtt-transport-corba)
