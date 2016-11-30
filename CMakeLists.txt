@@ -15,6 +15,8 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(OROCOS-RTT REQUIRED COMPONENTS rtt-scripting rtt-transport-corba)
 include(${OROCOS-RTT_USE_FILE_PATH}/UseOROCOS-RTT.cmake )
 
+find_package(orocos-ocl REQUIRED)
+
 include_directories(${catkin_INCLUDE_DIRS})
 
 include_directories(${catkin_INCLUDE_DIRS} ${Eigen_INCLUDE_DIRS})
@@ -38,12 +40,28 @@ target_link_libraries(master_component
     ${orocos_kdl_LIBRARIES}
     ${OROCOS-RTT_LIBRARIES})
 
+
+find_package(orocos-ocl REQUIRED)
+
+orocos_use_package( ocl-taskbrowser )
+orocos_use_package( ocl-deployment )
+
+link_directories(${orocos-ocl_LIBRARY_DIRS})
+include_directories(${orocos-ocl_INCLUDE_DIRS})
+
+add_library(subsystem_deployer src/subsystem_deployer.cpp)
+target_link_libraries( subsystem_deployer ${OROCOS-RTT_LIBRARIES} ${USE_OROCOS_LIBRARIES})
+
+orocos_executable( deployer src/deployer.cpp src/subsystem_deployer.cpp )
+#target_link_libraries( deployer ${EXTRA_DEPS} )
+target_link_libraries( deployer ${OROCOS-RTT_LIBRARIES} ${USE_OROCOS_LIBRARIES})
+
 ### Orocos Package Exports and Install Targets ###
 
 # Export package information (replaces catkin_package() macro) 
 orocos_generate_package(
   INCLUDE_DIRS include
-  LIBRARIES velma_core_cs_task_cs_interface
+  LIBRARIES subsystem_deployer
   CATKIN_DEPENDS rtt_ros geometry_msgs std_msgs message_runtime rtt_roscomm common_interfaces
 )
 
