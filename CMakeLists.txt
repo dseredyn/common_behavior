@@ -47,19 +47,11 @@ orocos_use_package( ocl-deployment )
 link_directories(${orocos-ocl_LIBRARY_DIRS})
 include_directories(${orocos-ocl_INCLUDE_DIRS})
 
-add_library(subsystem_deployer src/subsystem_deployer.cpp)
-target_link_libraries( subsystem_deployer ${OROCOS-RTT_LIBRARIES} ${USE_OROCOS_LIBRARIES})
-
-orocos_executable( deployer src/deployer.cpp src/subsystem_deployer.cpp )
-#target_link_libraries( deployer ${EXTRA_DEPS} )
-target_link_libraries( deployer ${OROCOS-RTT_LIBRARIES} ${USE_OROCOS_LIBRARIES})
-
 ### Orocos Package Exports and Install Targets ###
 
 # Export package information (replaces catkin_package() macro) 
 orocos_generate_package(
   INCLUDE_DIRS include
-  LIBRARIES subsystem_deployer
   CATKIN_DEPENDS rtt_ros geometry_msgs std_msgs message_runtime rtt_roscomm common_interfaces
 )
 
