@@ -42,7 +42,7 @@ class StateBase {
 public:
 
     virtual bool checkInitialCondition(
-            const InputData& in_data,
+            const boost::shared_ptr<InputData >& in_data,
             const std::vector<RTT::TaskContext*> &components,
             const std::string& prev_state_name,
             bool in_error) const = 0;

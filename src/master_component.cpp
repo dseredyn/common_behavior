@@ -38,6 +38,7 @@
 #include "common_behavior/abstract_state.h"
 #include "common_behavior/input_data.h"
 #include "common_behavior/master_service_requester.h"
+#include "common_behavior/master_service.h"
 
 using namespace RTT;
 
@@ -87,6 +88,8 @@ private:
     bool diag_cmd_in_received_;
 
     boost::shared_ptr<common_behavior::MasterServiceRequester > master_service_;
+
+    boost::shared_ptr<common_behavior::InputData > in_data_;
 };
 
 MasterComponent::MasterComponent(const std::string &name) :
@@ -119,6 +122,12 @@ bool MasterComponent::configureHook() {
     master_service_ = this->getProvider<common_behavior::MasterServiceRequester >("master");
     if (!master_service_) {
         RTT::log(RTT::Error) << "Unable to load common_behavior::MasterService" << RTT::endlog();
+        return false;
+    }
+
+    in_data_ = master_service_->getDataSample();
+    if (!in_data_) {
+        RTT::log(RTT::Error) << "Unable to get InputData sample" << RTT::endlog();
         return false;
     }
 
@@ -277,14 +286,10 @@ void MasterComponent::stopHook() {
 }
 
 void MasterComponent::updateHook() {
-    Logger::In in("MasterComponent::updateHook");
-
     int id_faulty_module;
     int id_faulty_submodule;
 
-    common_behavior::InputData in_data;
-
-    master_service_->readPorts(in_data);
+    master_service_->readPorts(in_data_);
 
 // TODO:
 //    diag_cmd_in_received_ = cmd_in_received;
@@ -302,12 +307,12 @@ void MasterComponent::updateHook() {
     // check error condition
     //
     bool pred_err = false;
-    pred_err = current_behavior->checkErrorCondition(in_data, scheme_peers_);
+    pred_err = current_behavior->checkErrorCondition(in_data_, scheme_peers_);
 
     if (pred_err) {
         int next_state_index = -1;
         for (int i = 0; i < states_.size(); ++i) {
-            if ( states_[i]->checkInitialCondition(in_data, scheme_peers_, current_state_->getStateName(), true) ) {
+            if ( states_[i]->checkInitialCondition(in_data_, scheme_peers_, current_state_->getStateName(), true) ) {
                 if (next_state_index == -1) {
                     next_state_index = i;
                 }
@@ -342,12 +347,12 @@ void MasterComponent::updateHook() {
         // check stop condition
         //
         bool pred_stop = false;
-        pred_stop = current_behavior->checkStopCondition(in_data, scheme_peers_);
+        pred_stop = current_behavior->checkStopCondition(in_data_, scheme_peers_);
 
         if (pred_stop) {
             int next_state_index = -1;
             for (int i = 0; i < states_.size(); ++i) {
-                if ( states_[i]->checkInitialCondition(in_data, scheme_peers_, current_state_->getStateName(), false) ) {
+                if ( states_[i]->checkInitialCondition(in_data_, scheme_peers_, current_state_->getStateName(), false) ) {
                     if (next_state_index == -1) {
                         next_state_index = i;
                     }

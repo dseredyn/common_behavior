@@ -42,11 +42,11 @@ class BehaviorBase {
 public:
 
     virtual bool checkErrorCondition(
-            const InputData& in_data,
+            const boost::shared_ptr<InputData >& in_data,
             const std::vector<RTT::TaskContext*> &components) const = 0;
 
     virtual bool checkStopCondition(
-            const InputData& in_data,
+            const boost::shared_ptr<InputData >& in_data,
             const std::vector<RTT::TaskContext*> &components) const = 0;
 
     const std::string& getName() const {

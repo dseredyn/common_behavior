@@ -23,12 +23,15 @@ class MasterServiceRequester : public RTT::ServiceRequester {
  public:
   explicit MasterServiceRequester(RTT::TaskContext *owner) :
     RTT::ServiceRequester("master", owner),
-    readPorts("readPorts")
+    readPorts("readPorts"),
+    getDataSample("getDataSample")
 {
     this->addOperationCaller(readPorts);
+    this->addOperationCaller(getDataSample);
   }
 
-  RTT::OperationCaller<void(InputData&)> readPorts;
+  RTT::OperationCaller<void(boost::shared_ptr<InputData >&)> readPorts;
+  RTT::OperationCaller<boost::shared_ptr<InputData >()> getDataSample;
 };
 }   // namespace common_behavior
 

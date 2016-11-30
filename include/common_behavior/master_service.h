@@ -44,9 +44,11 @@ class MasterService: public RTT::Service {
   explicit MasterService(RTT::TaskContext* owner) :
       RTT::Service("master", owner) {
     this->addOperation("readPorts", &MasterService::readPorts, this, RTT::ClientThread);
+    this->addOperation("getDataSample", &MasterService::getDataSample, this, RTT::ClientThread);
   }
 
-  virtual void readPorts(InputData& in_data) = 0;
+  virtual void readPorts(boost::shared_ptr<InputData >& in_data) = 0;
+  virtual boost::shared_ptr<InputData > getDataSample() = 0;
 };
 
 }   // namespace common_behavior
