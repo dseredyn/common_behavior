@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2014, Robot Control and Pattern Recognition Group, Warsaw University of Technology
+ Copyright (c) 2016, Robot Control and Pattern Recognition Group, Warsaw University of Technology
  All rights reserved.
  
  Redistribution and use in source and binary forms, with or without
@@ -25,10 +25,12 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef MASTER_SERVICE_H_
-#define MASTER_SERVICE_H_
+
+#ifndef COMMON_BEHAVIOR_MASTER_SERVICE_H_
+#define COMMON_BEHAVIOR_MASTER_SERVICE_H_
 
 #include "common_behavior/input_data.h"
+#include "common_behavior/buffer_info.h"
 
 #include "Eigen/Dense"
 
@@ -45,12 +47,21 @@ class MasterService: public RTT::Service {
       RTT::Service("master", owner) {
     this->addOperation("readPorts", &MasterService::readPorts, this, RTT::ClientThread);
     this->addOperation("getDataSample", &MasterService::getDataSample, this, RTT::ClientThread);
+    this->addOperation("getLowerInputBuffers", &MasterService::getLowerInputBuffers, this, RTT::ClientThread);
+    this->addOperation("getUpperInputBuffers", &MasterService::getUpperInputBuffers, this, RTT::ClientThread);
+    this->addOperation("getLowerOutputBuffers", &MasterService::getLowerOutputBuffers, this, RTT::ClientThread);
+    this->addOperation("getUpperOutputBuffers", &MasterService::getUpperOutputBuffers, this, RTT::ClientThread);
   }
 
   virtual void readPorts(boost::shared_ptr<InputData >& in_data) = 0;
   virtual boost::shared_ptr<InputData > getDataSample() = 0;
+  virtual void getLowerInputBuffers(std::vector<InputBufferInfo >&) const = 0;
+  virtual void getUpperInputBuffers(std::vector<InputBufferInfo >&) const = 0;
+  virtual void getLowerOutputBuffers(std::vector<OutputBufferInfo >&) const = 0;
+  virtual void getUpperOutputBuffers(std::vector<OutputBufferInfo >&) const = 0;
 };
 
 }   // namespace common_behavior
 
-#endif  // MASTER_SERVICE_H_
+#endif  // COMMON_BEHAVIOR_MASTER_SERVICE_H_
+
