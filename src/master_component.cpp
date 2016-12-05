@@ -100,9 +100,6 @@ MasterComponent::MasterComponent(const std::string &name) :
     this->ports()->addPort("status_test_OUTPORT", port_status_test_out_);
 
     this->addOperation("getDiag", &MasterComponent::getDiag, this, RTT::ClientThread);
-
-    addProperty("state_names", state_names_);
-    addProperty("initial_state_name", initial_state_name_);
 }
 
 std::string MasterComponent::getDiag() {
@@ -130,6 +127,9 @@ bool MasterComponent::configureHook() {
         RTT::log(RTT::Error) << "Unable to get InputData sample" << RTT::endlog();
         return false;
     }
+
+    state_names_ = master_service_->getStates();
+    initial_state_name_ = master_service_->getInitialState();
 
     for (auto it = common_behavior::StateFactory::Instance()->getStates().begin();
         it != common_behavior::StateFactory::Instance()->getStates().end(); ++it)

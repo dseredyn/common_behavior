@@ -30,48 +30,13 @@
 
 namespace common_behavior {
 
-class InputBufferInfo {
+
+
+class BufferInfo {
 public:
-    InputBufferInfo(    bool enable_ipc,
-                        const std::string& ipc_channel_name,
-                        bool event_port,
-                        bool always_update_peers,
-                        const std::string& interface_prefix,
-                        const std::string& master_component_port_name)
-        : enable_ipc_(enable_ipc)
-        , ipc_channel_name_(ipc_channel_name)
-        , event_port_(event_port)
-        , always_update_peers_(always_update_peers)
-        , interface_prefix_(interface_prefix)
-        , master_component_port_name_(master_component_port_name) {
-    }
-
-    // determines if shm ipc interface should be created
-    bool enable_ipc_;
-
-    // ipc channel name
-    std::string ipc_channel_name_;
-
-    // determines if the buffer component is triggered by new data
-    bool event_port_;
-
-    // determines if the buffer component should trigger its slaves
-    // even if there is no new data on channel
-    bool always_update_peers_;
-
-    // the prefix used to generate interface classes with macro
-    // ORO_LIST_INTERFACE_COMPONENTS
-    std::string interface_prefix_;
-
-    // the name of the corresponding port in the master component
-    std::string master_component_port_name_;
-};
-
-class OutputBufferInfo {
-public:
-    OutputBufferInfo(   bool enable_ipc,
-                        const std::string& ipc_channel_name,
-                        const std::string& interface_prefix)
+    BufferInfo( bool enable_ipc,
+                const std::string& ipc_channel_name,
+                const std::string& interface_prefix)
         : enable_ipc_(enable_ipc)
         , ipc_channel_name_(ipc_channel_name)
         , interface_prefix_(interface_prefix) {
@@ -86,6 +51,45 @@ public:
     // the prefix used to generate interface classes with macro
     // ORO_LIST_INTERFACE_COMPONENTS
     std::string interface_prefix_;
+};
+
+class InputBufferInfo : public BufferInfo {
+public:
+    InputBufferInfo(    bool enable_ipc,
+                        const std::string& ipc_channel_name,
+                        bool event_port,
+                        bool always_update_peers,
+                        const std::string& interface_prefix,
+                        const std::string& master_component_port_name)//,
+//                        const std::vector<std::string >& update_peer_list)
+        : BufferInfo(enable_ipc, ipc_channel_name, interface_prefix)
+        , event_port_(event_port)
+        , always_update_peers_(always_update_peers)
+        , master_component_port_name_(master_component_port_name) {//,
+//        , update_peer_list_(update_peer_list) {
+    }
+
+    // determines if the buffer component is triggered by new data
+    bool event_port_;
+
+    // determines if the buffer component should trigger its slaves
+    // even if there is no new data on channel
+    bool always_update_peers_;
+
+    // the name of the corresponding port in the master component
+    std::string master_component_port_name_;
+
+    // list of additional peers that should be updated when Rx component is updated
+//    std::vector<std::string > update_peer_list_;
+};
+
+class OutputBufferInfo : public BufferInfo {
+public:
+    OutputBufferInfo(   bool enable_ipc,
+                        const std::string& ipc_channel_name,
+                        const std::string& interface_prefix)
+        : BufferInfo(enable_ipc, ipc_channel_name, interface_prefix) {
+    }
 };
 
 }   // namespace common_behavior

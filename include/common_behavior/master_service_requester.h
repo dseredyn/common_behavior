@@ -33,8 +33,6 @@
 
 #include <string>
 
-#include "Eigen/Dense"
-
 #include "rtt/RTT.hpp"
 
 namespace common_behavior {
@@ -48,22 +46,35 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     getLowerInputBuffers("getLowerInputBuffers"),
     getUpperInputBuffers("getUpperInputBuffers"),
     getLowerOutputBuffers("getLowerOutputBuffers"),
-    getUpperOutputBuffers("getUpperOutputBuffers")
+    getUpperOutputBuffers("getUpperOutputBuffers"),
+    getStates("getStates"),
+    getInitialState("getInitialState")
 {
     this->addOperationCaller(readPorts);
     this->addOperationCaller(getDataSample);
+
     this->addOperationCaller(getLowerInputBuffers);
     this->addOperationCaller(getUpperInputBuffers);
     this->addOperationCaller(getLowerOutputBuffers);
     this->addOperationCaller(getUpperOutputBuffers);
+
+    this->addOperationCaller(getStates);
+    this->addOperationCaller(getInitialState);
   }
 
+  // OROCOS ports operations
   RTT::OperationCaller<void(boost::shared_ptr<InputData >&)> readPorts;
   RTT::OperationCaller<boost::shared_ptr<InputData >()> getDataSample;
+
+  // subsystem buffers
   RTT::OperationCaller<void(std::vector<InputBufferInfo >&)> getLowerInputBuffers;
   RTT::OperationCaller<void(std::vector<InputBufferInfo >&)> getUpperInputBuffers;
   RTT::OperationCaller<void(std::vector<OutputBufferInfo >&)> getLowerOutputBuffers;
   RTT::OperationCaller<void(std::vector<OutputBufferInfo >&)> getUpperOutputBuffers;
+
+  // FSM parameters
+  RTT::OperationCaller<const std::vector<std::string >&()> getStates;
+  RTT::OperationCaller<const std::string&()> getInitialState;
 };
 }   // namespace common_behavior
 

@@ -32,8 +32,6 @@
 #include "common_behavior/input_data.h"
 #include "common_behavior/buffer_info.h"
 
-#include "Eigen/Dense"
-
 #include <rtt/RTT.hpp>
 #include <rtt/Service.hpp>
 #include <rtt/Logger.hpp>
@@ -47,18 +45,29 @@ class MasterService: public RTT::Service {
       RTT::Service("master", owner) {
     this->addOperation("readPorts", &MasterService::readPorts, this, RTT::ClientThread);
     this->addOperation("getDataSample", &MasterService::getDataSample, this, RTT::ClientThread);
+
     this->addOperation("getLowerInputBuffers", &MasterService::getLowerInputBuffers, this, RTT::ClientThread);
     this->addOperation("getUpperInputBuffers", &MasterService::getUpperInputBuffers, this, RTT::ClientThread);
     this->addOperation("getLowerOutputBuffers", &MasterService::getLowerOutputBuffers, this, RTT::ClientThread);
     this->addOperation("getUpperOutputBuffers", &MasterService::getUpperOutputBuffers, this, RTT::ClientThread);
+
+    this->addOperation("getStates", &MasterService::getStates, this, RTT::ClientThread);
+    this->addOperation("getInitialState", &MasterService::getInitialState, this, RTT::ClientThread);
   }
 
+  // OROCOS ports operations
   virtual void readPorts(boost::shared_ptr<InputData >& in_data) = 0;
   virtual boost::shared_ptr<InputData > getDataSample() = 0;
+
+  // subsystem buffers
   virtual void getLowerInputBuffers(std::vector<InputBufferInfo >&) const = 0;
   virtual void getUpperInputBuffers(std::vector<InputBufferInfo >&) const = 0;
   virtual void getLowerOutputBuffers(std::vector<OutputBufferInfo >&) const = 0;
   virtual void getUpperOutputBuffers(std::vector<OutputBufferInfo >&) const = 0;
+
+  // FSM parameters
+  virtual const std::vector<std::string >& getStates() const = 0;
+  virtual const std::string& getInitialState() const = 0;
 };
 
 }   // namespace common_behavior
