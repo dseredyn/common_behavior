@@ -12,7 +12,6 @@
   <!-- Build deps are queried automatically with orocos_use_package() -->
   <build_depend>rtt</build_depend>
   <build_depend>ocl</build_depend>
-  <build_depend>common_services</build_depend>
   <build_depend>diagnostic_msgs</build_depend>
 
   <run_depend>rtt</run_depend>

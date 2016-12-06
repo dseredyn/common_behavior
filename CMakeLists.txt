@@ -9,7 +9,6 @@ find_package(catkin REQUIRED COMPONENTS
   kdl_conversions
   cmake_modules
   diagnostic_msgs
-  common_services
   )
 
 find_package(OROCOS-RTT REQUIRED COMPONENTS rtt-scripting rtt-transport-corba)
