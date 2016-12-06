@@ -5,9 +5,11 @@ project(common_behavior)
 # Find the RTT-ROS package (this transitively includes the Orocos CMake macros)
 find_package(catkin REQUIRED COMPONENTS
   rtt_ros
-  diagnostic_msgs
   eigen_conversions
-  kdl_conversions cmake_modules
+  kdl_conversions
+  cmake_modules
+  diagnostic_msgs
+  common_services
   )
 
 find_package(OROCOS-RTT REQUIRED COMPONENTS rtt-scripting rtt-transport-corba)
@@ -30,6 +32,7 @@ include_directories(${USE_OROCOS_INCLUDE_DIRS} include)
 
 orocos_component(master_component
     src/master_component.cpp
+    src/diagnostic_component.cpp
 )
 
 target_link_libraries(master_component

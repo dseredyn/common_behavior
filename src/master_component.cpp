@@ -28,6 +28,7 @@
 #include <rtt/RTT.hpp>
 #include <rtt/Component.hpp>
 #include <rtt/Logger.hpp>
+#include <rtt/extras/SlaveActivity.hpp>
 
 #include <math.h>
 
@@ -199,7 +200,11 @@ bool MasterComponent::configureHook() {
         }
     }
 
-
+    std::string switchable_components_str;
+    for (std::set<std::string >::const_iterator it = switchable_components.begin(); it != switchable_components.end(); ++it) {
+        switchable_components_str = switchable_components_str + (switchable_components_str.empty()?"":", ") + (*it);
+    }
+    Logger::log() << Logger::Info << "switchable components: " << switchable_components_str << Logger::endl;
 
 
 
@@ -212,6 +217,7 @@ bool MasterComponent::configureHook() {
 
     TaskContext::PeerList::const_iterator it = l.begin();
     scheme_ = this->getPeer( (*it) );
+    scheme_->setActivity( new RTT::extras::SlaveActivity(this->getActivity(), scheme_->engine()));
 
     RTT::OperationInterfacePart *hasBlockOp = scheme_->getOperation("hasBlock");
     if (hasBlockOp == NULL) {
@@ -321,6 +327,7 @@ void MasterComponent::updateHook() {
                     Logger::log() << Logger::Error << "two or more states have the same initial condition (err): current_state="
                         << current_state_->getStateName() << Logger::endl;
                     error();
+                    return;
                 }
             }
         }
@@ -361,6 +368,7 @@ void MasterComponent::updateHook() {
                         Logger::log() << Logger::Error << "two or more states have the same initial condition (stop): current_state="
                             << current_state_->getStateName() << Logger::endl;
                         error();
+                        return;
                     }
                 }
             }
@@ -404,6 +412,12 @@ void MasterComponent::updateHook() {
     //
     ++packet_counter_;
     port_status_test_out_.write(packet_counter_);
+
+    if (scheme_->getTaskState() != RTT::TaskContext::Running) {
+        RTT::log(RTT::Error) << "Component is not in the running state: " << scheme_->getName() << RTT::endlog();
+        error();
+    }
+    scheme_->update();
 }
 
 ORO_LIST_COMPONENT_TYPE(MasterComponent)

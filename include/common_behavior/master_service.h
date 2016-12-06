@@ -53,6 +53,8 @@ class MasterService: public RTT::Service {
 
     this->addOperation("getStates", &MasterService::getStates, this, RTT::ClientThread);
     this->addOperation("getInitialState", &MasterService::getInitialState, this, RTT::ClientThread);
+
+    this->addOperation("getLatchedConnections", &MasterService::getLatchedConnections, this, RTT::ClientThread);
   }
 
   // OROCOS ports operations
@@ -68,6 +70,8 @@ class MasterService: public RTT::Service {
   // FSM parameters
   virtual const std::vector<std::string >& getStates() const = 0;
   virtual const std::string& getInitialState() const = 0;
+
+  virtual const std::vector<std::pair<std::string, std::string > >& getLatchedConnections() const = 0;
 };
 
 }   // namespace common_behavior

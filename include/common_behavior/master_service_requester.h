@@ -48,7 +48,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     getLowerOutputBuffers("getLowerOutputBuffers"),
     getUpperOutputBuffers("getUpperOutputBuffers"),
     getStates("getStates"),
-    getInitialState("getInitialState")
+    getInitialState("getInitialState"),
+    getLatchedConnections("getLatchedConnections")
 {
     this->addOperationCaller(readPorts);
     this->addOperationCaller(getDataSample);
@@ -60,6 +61,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
 
     this->addOperationCaller(getStates);
     this->addOperationCaller(getInitialState);
+
+    this->addOperationCaller(getLatchedConnections);
   }
 
   // OROCOS ports operations
@@ -75,7 +78,10 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   // FSM parameters
   RTT::OperationCaller<const std::vector<std::string >&()> getStates;
   RTT::OperationCaller<const std::string&()> getInitialState;
+
+  RTT::OperationCaller<const std::vector<std::pair<std::string, std::string > >&() > getLatchedConnections;
 };
 }   // namespace common_behavior
 
 #endif  // COMMON_BEHAVIOR_MASTER_SERVICE_REQUESTER_H_
+

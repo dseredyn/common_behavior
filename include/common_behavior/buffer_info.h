@@ -30,8 +30,6 @@
 
 namespace common_behavior {
 
-
-
 class BufferInfo {
 public:
     BufferInfo( bool enable_ipc,
@@ -95,3 +93,4 @@ public:
 }   // namespace common_behavior
 
 #endif  // COMMON_BEHAVIOR_BUFFER_INFO_H_
+

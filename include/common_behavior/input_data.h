@@ -25,8 +25,8 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __INPUT_DATA_H__
-#define __INPUT_DATA_H__
+#ifndef COMMON_BEHAVIOR_INPUT_DATA_H__
+#define COMMON_BEHAVIOR_INPUT_DATA_H__
 
 namespace common_behavior {
 
@@ -37,5 +37,5 @@ public:
 
 };  // namespace common_behavior
 
-#endif  // __INPUT_DATA_H__
+#endif  // COMMON_BEHAVIOR_INPUT_DATA_H__
 

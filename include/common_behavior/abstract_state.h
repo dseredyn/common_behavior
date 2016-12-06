@@ -25,8 +25,8 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __ABSTRACT_STATE_H__
-#define __ABSTRACT_STATE_H__
+#ifndef __COMMON_BEHAVIOR_ABSTRACT_STATE_H__
+#define __COMMON_BEHAVIOR_ABSTRACT_STATE_H__
 
 #include "common_behavior/input_data.h"
 
@@ -129,5 +129,5 @@ public:
 
 };  // namespace common_behavior
 
-#endif  // __ABSTRACT_STATE_H__
+#endif  // __COMMON_BEHAVIOR_ABSTRACT_STATE_H__
 
