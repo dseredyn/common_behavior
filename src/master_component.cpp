@@ -110,8 +110,8 @@ std::string MasterComponent::getDiag() {
         return "";
     }
     
-    return "state: " + states_[state_id]->getStateName() + ", behavior: " + states_[state_id]->getBehaviorName() +
-            ", " + (diag_cmd_in_received_?"<receiving commands>":"<no commands>");
+    return "state: " + states_[state_id]->getStateName() + ", behavior: " + states_[state_id]->getBehaviorName();// +
+//            ", " + (diag_cmd_in_received_?"<receiving commands>":"<no commands>");
 }
 
 bool MasterComponent::configureHook() {
