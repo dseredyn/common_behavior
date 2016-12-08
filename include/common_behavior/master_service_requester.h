@@ -41,7 +41,9 @@ class MasterServiceRequester : public RTT::ServiceRequester {
  public:
   explicit MasterServiceRequester(RTT::TaskContext *owner) :
     RTT::ServiceRequester("master", owner),
-    readPorts("readPorts"),
+    initBuffers("initBuffers"),
+    readCommandPorts("readCommandPorts"),
+    readStatusPorts("readStatusPorts"),
     getDataSample("getDataSample"),
     getLowerInputBuffers("getLowerInputBuffers"),
     getUpperInputBuffers("getUpperInputBuffers"),
@@ -49,9 +51,12 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     getUpperOutputBuffers("getUpperOutputBuffers"),
     getStates("getStates"),
     getInitialState("getInitialState"),
-    getLatchedConnections("getLatchedConnections")
-{
-    this->addOperationCaller(readPorts);
+    getLatchedConnections("getLatchedConnections"),
+    getInputDataWaitCycles("getInputDataWaitCycles")
+  {
+    this->addOperationCaller(initBuffers);
+    this->addOperationCaller(readCommandPorts);
+    this->addOperationCaller(readStatusPorts);
     this->addOperationCaller(getDataSample);
 
     this->addOperationCaller(getLowerInputBuffers);
@@ -63,10 +68,14 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     this->addOperationCaller(getInitialState);
 
     this->addOperationCaller(getLatchedConnections);
+
+    this->addOperationCaller(getInputDataWaitCycles);
   }
 
   // OROCOS ports operations
-  RTT::OperationCaller<void(boost::shared_ptr<InputData >&)> readPorts;
+  RTT::OperationCaller<void (boost::shared_ptr<InputData >&)> initBuffers;
+  RTT::OperationCaller<bool(boost::shared_ptr<InputData >&)> readCommandPorts;
+  RTT::OperationCaller<bool(boost::shared_ptr<InputData >&)> readStatusPorts;
   RTT::OperationCaller<boost::shared_ptr<InputData >()> getDataSample;
 
   // subsystem buffers
@@ -76,10 +85,12 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<void(std::vector<OutputBufferInfo >&)> getUpperOutputBuffers;
 
   // FSM parameters
-  RTT::OperationCaller<const std::vector<std::string >&()> getStates;
-  RTT::OperationCaller<const std::string&()> getInitialState;
+  RTT::OperationCaller<std::vector<std::string >()> getStates;
+  RTT::OperationCaller<std::string()> getInitialState;
 
-  RTT::OperationCaller<const std::vector<std::pair<std::string, std::string > >&() > getLatchedConnections;
+  RTT::OperationCaller<std::vector<std::pair<std::string, std::string > >() > getLatchedConnections;
+
+  RTT::OperationCaller<int() > getInputDataWaitCycles;
 };
 }   // namespace common_behavior
 

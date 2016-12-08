@@ -57,6 +57,8 @@ public:
 
     std::string getDiag();
 
+    bool addConmanScheme(RTT::TaskContext* scheme);
+
 private:
     // parameters
     std::vector<std::string > state_names_;
@@ -83,24 +85,25 @@ private:
     std::vector<std::vector<bool> > is_running_;
 
     bool state_switch_;
-    uint32_t packet_counter_;
 
     int diag_current_state_id_;
-    bool diag_cmd_in_received_;
 
     boost::shared_ptr<common_behavior::MasterServiceRequester > master_service_;
 
     boost::shared_ptr<common_behavior::InputData > in_data_;
+
+    int input_data_wait_counter_;
 };
 
 MasterComponent::MasterComponent(const std::string &name) :
     TaskContext(name, PreOperational),
-    diag_current_state_id_(0),
-    diag_cmd_in_received_(false)
+    diag_current_state_id_(0)
 {
     this->ports()->addPort("status_test_OUTPORT", port_status_test_out_);
 
     this->addOperation("getDiag", &MasterComponent::getDiag, this, RTT::ClientThread);
+
+    this->addOperation("addConmanScheme", &MasterComponent::addConmanScheme, this, RTT::ClientThread);
 }
 
 std::string MasterComponent::getDiag() {
@@ -110,8 +113,12 @@ std::string MasterComponent::getDiag() {
         return "";
     }
     
-    return "state: " + states_[state_id]->getStateName() + ", behavior: " + states_[state_id]->getBehaviorName();// +
-//            ", " + (diag_cmd_in_received_?"<receiving commands>":"<no commands>");
+    return "state: " + states_[state_id]->getStateName() + ", behavior: " + states_[state_id]->getBehaviorName();
+}
+
+bool MasterComponent::addConmanScheme(RTT::TaskContext* scheme) {
+    scheme_ = scheme;
+    return scheme_->setActivity( new RTT::extras::SlaveActivity(this->getActivity(), scheme_->engine()));
 }
 
 bool MasterComponent::configureHook() {
@@ -120,12 +127,6 @@ bool MasterComponent::configureHook() {
     master_service_ = this->getProvider<common_behavior::MasterServiceRequester >("master");
     if (!master_service_) {
         RTT::log(RTT::Error) << "Unable to load common_behavior::MasterService" << RTT::endlog();
-        return false;
-    }
-
-    in_data_ = master_service_->getDataSample();
-    if (!in_data_) {
-        RTT::log(RTT::Error) << "Unable to get InputData sample" << RTT::endlog();
         return false;
     }
 
@@ -208,7 +209,7 @@ bool MasterComponent::configureHook() {
 
 
 
-
+/*
     TaskContext::PeerList l = this->getPeerList();
     if (l.size() != 1) {
         Logger::log() << Logger::Error << "wrong number of peers: " << l.size() << ", should be 1" << Logger::endl;
@@ -218,10 +219,11 @@ bool MasterComponent::configureHook() {
     TaskContext::PeerList::const_iterator it = l.begin();
     scheme_ = this->getPeer( (*it) );
     scheme_->setActivity( new RTT::extras::SlaveActivity(this->getActivity(), scheme_->engine()));
+*/
 
     RTT::OperationInterfacePart *hasBlockOp = scheme_->getOperation("hasBlock");
     if (hasBlockOp == NULL) {
-        Logger::log() << Logger::Error << "the peer " << (*it) << " has no matching operation hasBlock" << Logger::endl;
+        Logger::log() << Logger::Error << "the peer " << scheme_->getName() << " has no matching operation hasBlock" << Logger::endl;
         return false;
     }
 
@@ -238,7 +240,7 @@ bool MasterComponent::configureHook() {
 
     RTT::OperationInterfacePart *addGraphConfigurationOp = scheme_->getOperation("addGraphConfiguration");
     if (addGraphConfigurationOp == NULL) {
-        Logger::log() << Logger::Error << "the peer " << (*it) << " has no matching operation addGraphConfiguration" << Logger::endl;
+        Logger::log() << Logger::Error << "the peer " << scheme_->getName() << " has no matching operation addGraphConfiguration" << Logger::endl;
         return false;
     }
 
@@ -247,7 +249,7 @@ bool MasterComponent::configureHook() {
 
     RTT::OperationInterfacePart *switchToConfigurationOp = scheme_->getOperation("switchToConfiguration");
     if (switchToConfigurationOp == NULL) {
-        Logger::log() << Logger::Error << "the peer " << (*it) << " has no matching operation switchToConfiguration" << Logger::endl;
+        Logger::log() << Logger::Error << "the peer " << scheme_->getName() << " has no matching operation switchToConfiguration" << Logger::endl;
         return false;
     }
 
@@ -284,7 +286,16 @@ bool MasterComponent::configureHook() {
 
 bool MasterComponent::startHook() {
     state_switch_ = true;
-    packet_counter_ = 1;
+    input_data_wait_counter_ = master_service_->getInputDataWaitCycles();
+
+    in_data_ = master_service_->getDataSample();
+    if (!in_data_) {
+        RTT::log(RTT::Error) << "Unable to get InputData sample" << RTT::endlog();
+        return false;
+    }
+
+    master_service_->initBuffers(in_data_);
+
     return true;
 }
 
@@ -292,13 +303,24 @@ void MasterComponent::stopHook() {
 }
 
 void MasterComponent::updateHook() {
-    int id_faulty_module;
-    int id_faulty_submodule;
+    bool read_inputs = master_service_->readCommandPorts(in_data_);
 
-    master_service_->readPorts(in_data_);
-
-// TODO:
-//    diag_cmd_in_received_ = cmd_in_received;
+    // this should be used in simulation only (on non-RT system)
+    // behavior:
+    // <new data> - no wait
+    // <new data> - no wait
+    // <no data>  - wait (up to wait_cycles)
+    // <no data>  - no wait
+    if (read_inputs) {
+        input_data_wait_counter_ = master_service_->getInputDataWaitCycles();
+    }
+    else {
+        if (input_data_wait_counter_ > 0) {
+        RTT::log(RTT::Info) << "wait " << input_data_wait_counter_ << RTT::endlog();
+            --input_data_wait_counter_;
+            return;
+        }
+    }
 
     // get current behavior
     std::shared_ptr<common_behavior::BehaviorBase > current_behavior;
@@ -314,6 +336,15 @@ void MasterComponent::updateHook() {
     //
     bool pred_err = false;
     pred_err = current_behavior->checkErrorCondition(in_data_, scheme_peers_);
+
+/*
+TODO: check if all components are in proper state
+    if (!pred_err) {
+        for (int i = 0; i < scheme_peers_.size(); ++i) {
+            scheme_peers_[i]
+        }
+    }
+*/
 
     if (pred_err) {
         int next_state_index = -1;
@@ -335,6 +366,8 @@ void MasterComponent::updateHook() {
             Logger::In in("MasterComponent::updateHook");
             Logger::log() << Logger::Error << "cannot switch to new state (initial condition, err): current_state="
                 << current_state_->getStateName() << Logger::endl;
+            error();
+            return;
         }
         else {
             Logger::log() << Logger::Error << "state_switch from "
@@ -376,6 +409,8 @@ void MasterComponent::updateHook() {
                 Logger::In in("MasterComponent::updateHook");
                 Logger::log() << Logger::Error << "cannot switch to new state (initial condition, stop): current_state="
                     << current_state_->getStateName() << Logger::endl;
+                error();
+                return;
             }
             else {
                 Logger::log() << Logger::Error << "state_switch from "
@@ -407,17 +442,17 @@ void MasterComponent::updateHook() {
         state_switch_ = false;
     }
 
-    //
-    // write test field
-    //
-    ++packet_counter_;
-    port_status_test_out_.write(packet_counter_);
-
     if (scheme_->getTaskState() != RTT::TaskContext::Running) {
         RTT::log(RTT::Error) << "Component is not in the running state: " << scheme_->getName() << RTT::endlog();
         error();
+        return;
     }
     scheme_->update();
+
+    master_service_->initBuffers(in_data_);
+    if (!master_service_->readStatusPorts(in_data_)) {
+        error();
+    }
 }
 
 ORO_LIST_COMPONENT_TYPE(MasterComponent)

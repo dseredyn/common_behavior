@@ -67,6 +67,8 @@ private:
 
     std::vector<TaskContext* > peers_;
     std::vector<Diag > diag_vec_;
+
+//    std::vector<double >
 };
 
 static std::string getTaskStatusChar(RTT::TaskContext* t)
