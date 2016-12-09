@@ -332,7 +332,7 @@ void MasterComponent::updateHook() {
 // TODO: determine if this is needed here
 //    master_service_->initBuffers(in_data_);
     if (!master_service_->readStatusPorts(in_data_)) {
-        RTT::log(RTT::Info) << "readStatusPorts: no data" << RTT::endlog();
+//        RTT::log(RTT::Info) << "readStatusPorts: no data" << RTT::endlog();
         //error();  // this is not an error
     }
     else {
