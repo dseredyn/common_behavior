@@ -42,8 +42,10 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   explicit MasterServiceRequester(RTT::TaskContext *owner) :
     RTT::ServiceRequester("master", owner),
     initBuffers("initBuffers"),
-    readCommandPorts("readCommandPorts"),
     readStatusPorts("readStatusPorts"),
+    writeStatusPorts("writeStatusPorts"),
+    readCommandPorts("readCommandPorts"),
+    writeCommandPorts("writeCommandPorts"),
     getDataSample("getDataSample"),
     getLowerInputBuffers("getLowerInputBuffers"),
     getUpperInputBuffers("getUpperInputBuffers"),
@@ -55,8 +57,10 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     getInputDataWaitCycles("getInputDataWaitCycles")
   {
     this->addOperationCaller(initBuffers);
-    this->addOperationCaller(readCommandPorts);
     this->addOperationCaller(readStatusPorts);
+    this->addOperationCaller(writeStatusPorts);
+    this->addOperationCaller(readCommandPorts);
+    this->addOperationCaller(writeCommandPorts);
     this->addOperationCaller(getDataSample);
 
     this->addOperationCaller(getLowerInputBuffers);
@@ -74,8 +78,10 @@ class MasterServiceRequester : public RTT::ServiceRequester {
 
   // OROCOS ports operations
   RTT::OperationCaller<void (boost::shared_ptr<InputData >&)> initBuffers;
-  RTT::OperationCaller<bool(boost::shared_ptr<InputData >&)> readCommandPorts;
   RTT::OperationCaller<bool(boost::shared_ptr<InputData >&)> readStatusPorts;
+  RTT::OperationCaller<void (boost::shared_ptr<InputData>&)> writeStatusPorts;
+  RTT::OperationCaller<bool(boost::shared_ptr<InputData >&)> readCommandPorts;
+  RTT::OperationCaller<void (boost::shared_ptr<InputData>&)> writeCommandPorts;
   RTT::OperationCaller<boost::shared_ptr<InputData >()> getDataSample;
 
   // subsystem buffers

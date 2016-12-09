@@ -45,7 +45,9 @@ class MasterService: public RTT::Service {
       RTT::Service("master", owner) {
     this->addOperation("initBuffers", &MasterService::initBuffers, this, RTT::ClientThread);
     this->addOperation("readStatusPorts", &MasterService::readStatusPorts, this, RTT::ClientThread);
+    this->addOperation("writeStatusPorts", &MasterService::writeStatusPorts, this, RTT::ClientThread);
     this->addOperation("readCommandPorts", &MasterService::readCommandPorts, this, RTT::ClientThread);
+    this->addOperation("writeCommandPorts", &MasterService::writeCommandPorts, this, RTT::ClientThread);
     this->addOperation("getDataSample", &MasterService::getDataSample, this, RTT::ClientThread);
 
     this->addOperation("getLowerInputBuffers", &MasterService::getLowerInputBuffers, this, RTT::ClientThread);
@@ -64,7 +66,9 @@ class MasterService: public RTT::Service {
   // OROCOS ports operations
   virtual void initBuffers(boost::shared_ptr<InputData >& in_data) const = 0;
   virtual bool readStatusPorts(boost::shared_ptr<InputData >& in_data) = 0;
+  virtual void writeStatusPorts(boost::shared_ptr<InputData>& in_data) = 0;
   virtual bool readCommandPorts(boost::shared_ptr<InputData >& in_data) = 0;
+  virtual void writeCommandPorts(boost::shared_ptr<InputData>& in_data) = 0;
   virtual boost::shared_ptr<InputData > getDataSample() const = 0;
 
   // subsystem buffers

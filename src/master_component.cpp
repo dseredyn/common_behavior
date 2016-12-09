@@ -303,6 +303,10 @@ void MasterComponent::stopHook() {
 }
 
 void MasterComponent::updateHook() {
+
+    master_service_->initBuffers(in_data_);
+
+//    Logger::In in("MasterComponent::updateHook");
     bool read_inputs = master_service_->readCommandPorts(in_data_);
 
     // this should be used in simulation only (on non-RT system)
@@ -313,13 +317,26 @@ void MasterComponent::updateHook() {
     // <no data>  - no wait
     if (read_inputs) {
         input_data_wait_counter_ = master_service_->getInputDataWaitCycles();
+//        RTT::log(RTT::Info) << "data ok" << RTT::endlog();
     }
     else {
         if (input_data_wait_counter_ > 0) {
-        RTT::log(RTT::Info) << "wait " << input_data_wait_counter_ << RTT::endlog();
+//            RTT::log(RTT::Info) << "wait " << input_data_wait_counter_ << RTT::endlog();
             --input_data_wait_counter_;
             return;
         }
+    }
+
+    master_service_->writeCommandPorts(in_data_);
+
+// TODO: determine if this is needed here
+//    master_service_->initBuffers(in_data_);
+    if (!master_service_->readStatusPorts(in_data_)) {
+        RTT::log(RTT::Info) << "readStatusPorts: no data" << RTT::endlog();
+        //error();  // this is not an error
+    }
+    else {
+        master_service_->writeStatusPorts(in_data_);
     }
 
     // get current behavior
@@ -448,11 +465,14 @@ TODO: check if all components are in proper state
         return;
     }
     scheme_->update();
-
+/*
+// TODO: determine if this is needed here
     master_service_->initBuffers(in_data_);
     if (!master_service_->readStatusPorts(in_data_)) {
         error();
     }
+    master_service_->writeStatusPorts(in_data_);
+*/
 }
 
 ORO_LIST_COMPONENT_TYPE(MasterComponent)

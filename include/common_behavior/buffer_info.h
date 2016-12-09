@@ -56,29 +56,13 @@ public:
     InputBufferInfo(    bool enable_ipc,
                         const std::string& ipc_channel_name,
                         bool event_port,
-                        bool always_update_peers,
-                        const std::string& interface_prefix,
-                        const std::string& master_component_port_name)//,
-//                        const std::vector<std::string >& update_peer_list)
+                        const std::string& interface_prefix)
         : BufferInfo(enable_ipc, ipc_channel_name, interface_prefix)
-        , event_port_(event_port)
-        , always_update_peers_(always_update_peers)
-        , master_component_port_name_(master_component_port_name) {//,
-//        , update_peer_list_(update_peer_list) {
+        , event_port_(event_port) {
     }
 
     // determines if the buffer component is triggered by new data
     bool event_port_;
-
-    // determines if the buffer component should trigger its slaves
-    // even if there is no new data on channel
-    bool always_update_peers_;
-
-    // the name of the corresponding port in the master component
-    std::string master_component_port_name_;
-
-    // list of additional peers that should be updated when Rx component is updated
-//    std::vector<std::string > update_peer_list_;
 };
 
 class OutputBufferInfo : public BufferInfo {
