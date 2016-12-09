@@ -387,13 +387,13 @@ TODO: check if all components are in proper state
             return;
         }
         else {
-            Logger::log() << Logger::Error << "state_switch from "
+            Logger::log() << Logger::Info << "state_switch from "
                << current_state_->getStateName() << Logger::endl;
 
             current_state_ = states_[next_state_index];
             diag_current_state_id_ = next_state_index;
 
-            Logger::log() << Logger::Error << "state_switch to "
+            Logger::log() << Logger::Info << "state_switch to "
                << current_state_->getStateName() << Logger::endl;
 
             state_switch_ = true;
@@ -430,13 +430,13 @@ TODO: check if all components are in proper state
                 return;
             }
             else {
-                Logger::log() << Logger::Error << "state_switch from "
+                Logger::log() << Logger::Info << "state_switch from "
                    << current_state_->getStateName() << Logger::endl;
 
                 current_state_ = states_[next_state_index];
                 diag_current_state_id_ = next_state_index;
 
-                Logger::log() << Logger::Error << "state_switch to "
+                Logger::log() << Logger::Info << "state_switch to "
                    << current_state_->getStateName() << Logger::endl;
 
                 state_switch_ = true;
