@@ -33,18 +33,13 @@ namespace common_behavior {
 class BufferInfo {
 public:
     BufferInfo( bool enable_ipc,
-                const std::string& ipc_channel_name,
                 const std::string& interface_prefix)
         : enable_ipc_(enable_ipc)
-        , ipc_channel_name_(ipc_channel_name)
         , interface_prefix_(interface_prefix) {
     }
 
     // determines if shm ipc interface should be created
     bool enable_ipc_;
-
-    // ipc channel name
-    std::string ipc_channel_name_;
 
     // the prefix used to generate interface classes with macro
     // ORO_LIST_INTERFACE_COMPONENTS
@@ -54,10 +49,9 @@ public:
 class InputBufferInfo : public BufferInfo {
 public:
     InputBufferInfo(    bool enable_ipc,
-                        const std::string& ipc_channel_name,
                         bool event_port,
                         const std::string& interface_prefix)
-        : BufferInfo(enable_ipc, ipc_channel_name, interface_prefix)
+        : BufferInfo(enable_ipc, interface_prefix)
         , event_port_(event_port) {
     }
 
@@ -68,9 +62,8 @@ public:
 class OutputBufferInfo : public BufferInfo {
 public:
     OutputBufferInfo(   bool enable_ipc,
-                        const std::string& ipc_channel_name,
                         const std::string& interface_prefix)
-        : BufferInfo(enable_ipc, ipc_channel_name, interface_prefix) {
+        : BufferInfo(enable_ipc, interface_prefix) {
     }
 };
 
