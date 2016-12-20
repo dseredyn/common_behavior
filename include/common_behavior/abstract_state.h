@@ -51,19 +51,25 @@ public:
         return state_name_;
     }
 
+    const std::string& getShortStateName() const {
+        return short_state_name_;
+    }
+
     const std::string& getBehaviorName() const {
         return behavior_name_;
     }
 
 protected:
-    StateBase(const std::string& state_name, const std::string& behavior_name) :
-        state_name_(state_name),
-        behavior_name_(behavior_name)
+    StateBase(const std::string& state_name, const std::string& short_state_name, const std::string& behavior_name)
+        : state_name_(state_name)
+        , short_state_name_(short_state_name)
+        , behavior_name_(behavior_name)
     { }
 
 private:
     std::vector<std::string > running_;
     std::string state_name_;
+    std::string short_state_name_;
     std::string behavior_name_;
 };
 

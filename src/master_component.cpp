@@ -112,8 +112,16 @@ std::string MasterComponent::getDiag() {
     if (state_id < 0 || state_id >= states_.size()) {
         return "";
     }
-    
-    return "state: " + states_[state_id]->getStateName() + ", behavior: " + states_[state_id]->getBehaviorName();
+
+    std::string short_behavior_name;
+    for (int i = 0; i < behaviors_.size(); ++i) {
+        if (states_[state_id]->getBehaviorName() == behaviors_[i]->getName()) {
+            short_behavior_name = behaviors_[i]->getShortName();
+            break;
+        }
+    }
+
+    return "state: " + states_[state_id]->getShortStateName() + ", behavior: " + short_behavior_name;
 }
 
 bool MasterComponent::addConmanScheme(RTT::TaskContext* scheme) {

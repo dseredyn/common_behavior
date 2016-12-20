@@ -53,6 +53,10 @@ public:
         return name_;
     }
 
+    const std::string& getShortName() const {
+        return short_name_;
+    }
+
     const std::vector<std::string >& getRunningComponents() const {
         return running_;
     }
@@ -62,13 +66,15 @@ public:
     }
 
 protected:
-    BehaviorBase(const std::string& name) :
-        name_(name)
+    BehaviorBase(const std::string& name, const std::string& short_name)
+        : name_(name)
+        , short_name_(short_name)
     { }
 
 private:
     std::vector<std::string > running_;
     std::string name_;
+    std::string short_name_;
 };
 
 class BehaviorFactory
@@ -124,6 +130,7 @@ public:
             name = sample.getName();
         }
 
+        std::cout << "BehaviorRegistrar: " << name << std::endl;
         // register the class factory function 
         BehaviorFactory::Instance()->RegisterFactoryFunction(name,
                 [](void) -> BehaviorBase * { return new T();});
