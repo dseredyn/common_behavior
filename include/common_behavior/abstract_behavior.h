@@ -38,16 +38,58 @@
 
 namespace common_behavior {
 
+class AbstractConditionCause {
+public:
+    virtual operator bool() const = 0;
+};
+
+template <size_t N >
+class ConditionCause : public AbstractConditionCause {
+public:
+
+    ConditionCause() {
+        clear();
+    }
+
+    operator bool() const {
+        for (int i = 0; i < N; ++i) {
+            if (bitfield_[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void clear() {
+        for (int i = 0; i < N; ++i) {
+            bitfield_[i] = false;
+        }
+    }
+
+    void setBit(size_t bit_idx, bool value) {
+        bitfield_[bit_idx] = value;
+    }
+
+    bool getBit(int bit_idx) const {
+        return bitfield_[bit_idx];
+    }
+
+private:
+    boost::array<bool, N > bitfield_;
+};
+
 class BehaviorBase {
 public:
 
-    virtual bool checkErrorCondition(
-            const boost::shared_ptr<InputData >& in_data,
-            const std::vector<RTT::TaskContext*> &components) const = 0;
+    virtual const void checkErrorCondition(
+                const boost::shared_ptr<InputData >& in_data,
+                const std::vector<RTT::TaskContext*> &components,
+                boost::shared_ptr<AbstractConditionCause > result) const = 0;
 
-    virtual bool checkStopCondition(
-            const boost::shared_ptr<InputData >& in_data,
-            const std::vector<RTT::TaskContext*> &components) const = 0;
+    virtual const void checkStopCondition(
+                const boost::shared_ptr<InputData >& in_data,
+                const std::vector<RTT::TaskContext*> &components,
+                boost::shared_ptr<AbstractConditionCause > result) const = 0;
 
     const std::string& getName() const {
         return name_;
@@ -65,8 +107,9 @@ public:
         running_.push_back(name);
     }
 
+   
 protected:
-    BehaviorBase(const std::string& name, const std::string& short_name)
+    explicit BehaviorBase(const std::string& name, const std::string& short_name)
         : name_(name)
         , short_name_(short_name)
     { }

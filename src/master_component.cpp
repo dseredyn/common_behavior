@@ -92,6 +92,8 @@ private:
 
     boost::shared_ptr<common_behavior::InputData > in_data_;
 
+    boost::shared_ptr<common_behavior::AbstractConditionCause > error_condition_;
+
     int input_data_wait_counter_;
 };
 
@@ -289,18 +291,24 @@ bool MasterComponent::configureHook() {
         scheme_peers_.push_back( scheme_->getPeer(scheme_peers_names[pi]) );
     }
 
+    in_data_ = master_service_->getDataSample();
+    if (!in_data_) {
+        RTT::log(RTT::Error) << "Unable to get InputData sample" << RTT::endlog();
+        return false;
+    }
+
+    error_condition_ = master_service_->getErrorReasonSample();
+    if (!error_condition_) {
+        RTT::log(RTT::Error) << "Unable to get error reason sample" << RTT::endlog();
+        return false;
+    }
+
     return true;
 }
 
 bool MasterComponent::startHook() {
     state_switch_ = true;
     input_data_wait_counter_ = master_service_->getInputDataWaitCycles();
-
-    in_data_ = master_service_->getDataSample();
-    if (!in_data_) {
-        RTT::log(RTT::Error) << "Unable to get InputData sample" << RTT::endlog();
-        return false;
-    }
 
     master_service_->initBuffers(in_data_);
 
@@ -360,7 +368,8 @@ void MasterComponent::updateHook() {
     // check error condition
     //
     bool pred_err = false;
-    pred_err = current_behavior->checkErrorCondition(in_data_, scheme_peers_);
+    current_behavior->checkErrorCondition(in_data_, scheme_peers_, error_condition_);
+    pred_err = *error_condition_;
 
 /*
 TODO: check if all components are in proper state
@@ -412,7 +421,8 @@ TODO: check if all components are in proper state
         // check stop condition
         //
         bool pred_stop = false;
-        pred_stop = current_behavior->checkStopCondition(in_data_, scheme_peers_);
+        current_behavior->checkStopCondition(in_data_, scheme_peers_, error_condition_);
+        pred_stop = *error_condition_;
 
         if (pred_stop) {
             int next_state_index = -1;

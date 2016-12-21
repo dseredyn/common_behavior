@@ -31,6 +31,7 @@
 
 #include "common_behavior/input_data.h"
 #include "common_behavior/buffer_info.h"
+#include "common_behavior/abstract_behavior.h"
 
 #include <rtt/RTT.hpp>
 #include <rtt/Service.hpp>
@@ -61,6 +62,9 @@ class MasterService: public RTT::Service {
     this->addOperation("getLatchedConnections", &MasterService::getLatchedConnections, this, RTT::ClientThread);
 
     this->addOperation("getInputDataWaitCycles", &MasterService::getInputDataWaitCycles, this, RTT::ClientThread);
+
+    this->addOperation("getErrorReasonStr", &MasterService::getErrorReasonStr, this, RTT::ClientThread);
+    this->addOperation("getErrorReasonSample", &MasterService::getErrorReasonSample, this, RTT::ClientThread);
   }
 
   // OROCOS ports operations
@@ -84,6 +88,10 @@ class MasterService: public RTT::Service {
   virtual std::vector<std::pair<std::string, std::string > > getLatchedConnections() const = 0;
 
   virtual int getInputDataWaitCycles() const = 0;
+
+  // this method may not be RT-safe
+  virtual std::string getErrorReasonStr(boost::shared_ptr<common_behavior::AbstractConditionCause > error_reason) const = 0;
+  virtual boost::shared_ptr<common_behavior::AbstractConditionCause > getErrorReasonSample() const = 0;
 };
 
 }   // namespace common_behavior

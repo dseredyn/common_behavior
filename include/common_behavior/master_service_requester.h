@@ -54,7 +54,9 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     getStates("getStates"),
     getInitialState("getInitialState"),
     getLatchedConnections("getLatchedConnections"),
-    getInputDataWaitCycles("getInputDataWaitCycles")
+    getInputDataWaitCycles("getInputDataWaitCycles"),
+    getErrorReasonStr("getErrorReasonStr"),
+    getErrorReasonSample("getErrorReasonSample")
   {
     this->addOperationCaller(initBuffers);
     this->addOperationCaller(readStatusPorts);
@@ -74,6 +76,9 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     this->addOperationCaller(getLatchedConnections);
 
     this->addOperationCaller(getInputDataWaitCycles);
+
+    this->addOperationCaller(getErrorReasonStr);
+    this->addOperationCaller(getErrorReasonSample);
   }
 
   // OROCOS ports operations
@@ -97,6 +102,10 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<std::vector<std::pair<std::string, std::string > >() > getLatchedConnections;
 
   RTT::OperationCaller<int() > getInputDataWaitCycles;
+
+  // this method may not be RT-safe
+  RTT::OperationCaller<std::string(boost::shared_ptr<common_behavior::AbstractConditionCause >)> getErrorReasonStr;
+  RTT::OperationCaller<boost::shared_ptr<common_behavior::AbstractConditionCause >()> getErrorReasonSample;
 };
 }   // namespace common_behavior
 
