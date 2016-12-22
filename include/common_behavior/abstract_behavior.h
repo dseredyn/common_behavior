@@ -40,8 +40,20 @@ namespace common_behavior {
 
 class AbstractConditionCause {
 public:
-    virtual operator bool() const = 0;
+    virtual bool isEqual(const AbstractConditionCause& c) const = 0;
+    virtual bool orValue() const = 0;
+    virtual void clear() = 0;
+//    virtual void setBit(size_t bit_idx, bool value) = 0;
+//    virtual bool getBit(int bit_idx) const = 0;
+    virtual AbstractConditionCause& operator=(const AbstractConditionCause& arg) = 0;
 };
+
+bool operator==(const AbstractConditionCause& lhs, const AbstractConditionCause& rhs);
+
+bool operator!=(const AbstractConditionCause& lhs, const AbstractConditionCause& rhs);
+
+typedef boost::shared_ptr<AbstractConditionCause > AbstractConditionCausePtr;
+typedef boost::shared_ptr<const AbstractConditionCause > AbstractConditionCauseConstPtr;
 
 template <size_t N >
 class ConditionCause : public AbstractConditionCause {
@@ -51,7 +63,29 @@ public:
         clear();
     }
 
-    operator bool() const {
+    bool isEqual(const AbstractConditionCause& arg) const {
+        const ConditionCause<N>* c = dynamic_cast<const ConditionCause<N>* >(&arg);
+        if (!c) {
+            return false;
+        }
+        for (int i = 0; i < N; ++i) {
+            if (bitfield_[i] != c->bitfield_[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    AbstractConditionCause& operator=(const AbstractConditionCause& arg) {
+        const ConditionCause<N>* c = dynamic_cast<const ConditionCause<N>* >(&arg);
+        if (this != c) {
+            for (int i = 0; i < N; ++i) {
+                bitfield_[i] = c->bitfield_[i];
+            }
+        }
+    }
+
+    bool orValue() const {
         for (int i = 0; i < N; ++i) {
             if (bitfield_[i]) {
                 return true;
@@ -81,15 +115,14 @@ private:
 class BehaviorBase {
 public:
 
-    virtual const void checkErrorCondition(
+    virtual bool checkErrorCondition(
                 const boost::shared_ptr<InputData >& in_data,
                 const std::vector<RTT::TaskContext*> &components,
-                boost::shared_ptr<AbstractConditionCause > result) const = 0;
+                boost::shared_ptr<AbstractConditionCause > result = boost::shared_ptr<AbstractConditionCause >()) const = 0;
 
-    virtual const void checkStopCondition(
+    virtual bool checkStopCondition(
                 const boost::shared_ptr<InputData >& in_data,
-                const std::vector<RTT::TaskContext*> &components,
-                boost::shared_ptr<AbstractConditionCause > result) const = 0;
+                const std::vector<RTT::TaskContext*> &components) const = 0;
 
     const std::string& getName() const {
         return name_;

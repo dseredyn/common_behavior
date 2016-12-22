@@ -90,8 +90,8 @@ class MasterService: public RTT::Service {
   virtual int getInputDataWaitCycles() const = 0;
 
   // this method may not be RT-safe
-  virtual std::string getErrorReasonStr(boost::shared_ptr<common_behavior::AbstractConditionCause > error_reason) const = 0;
-  virtual boost::shared_ptr<common_behavior::AbstractConditionCause > getErrorReasonSample() const = 0;
+  virtual std::string getErrorReasonStr(AbstractConditionCauseConstPtr error_reason) const = 0;
+  virtual AbstractConditionCausePtr getErrorReasonSample() const = 0;
 };
 
 }   // namespace common_behavior

@@ -92,7 +92,8 @@ private:
 
     boost::shared_ptr<common_behavior::InputData > in_data_;
 
-    boost::shared_ptr<common_behavior::AbstractConditionCause > error_condition_;
+    common_behavior::AbstractConditionCausePtr error_condition_;
+    common_behavior::AbstractConditionCausePtr error_condition_saved_;
 
     int input_data_wait_counter_;
 };
@@ -123,7 +124,18 @@ std::string MasterComponent::getDiag() {
         }
     }
 
-    return "state: " + states_[state_id]->getShortStateName() + ", behavior: " + short_behavior_name;
+    std::string error_str;
+    if (error_condition_saved_) {
+        error_str = std::string(", error: ") + master_service_->getErrorReasonStr(error_condition_saved_);// + "x: " + master_service_->getErrorReasonStr(error_condition_);
+//        if (error_condition_->orValue()) {
+//            error_str += " err1";
+//        }
+//        if (error_condition_saved_->orValue()) {
+//            error_str += " err2";
+//        }
+//        error_condition_->clear();
+    }
+    return "state: " + states_[state_id]->getShortStateName() + ", behavior: " + short_behavior_name + error_str;
 }
 
 bool MasterComponent::addConmanScheme(RTT::TaskContext* scheme) {
@@ -298,8 +310,9 @@ bool MasterComponent::configureHook() {
     }
 
     error_condition_ = master_service_->getErrorReasonSample();
-    if (!error_condition_) {
-        RTT::log(RTT::Error) << "Unable to get error reason sample" << RTT::endlog();
+    error_condition_saved_ = master_service_->getErrorReasonSample();
+    if (!error_condition_ || !error_condition_saved_) {
+        RTT::log(RTT::Warning) << "Error reason sample was set to NULL. Error condition diagnostics is disabled." << RTT::endlog();
         return false;
     }
 
@@ -367,9 +380,13 @@ void MasterComponent::updateHook() {
     //
     // check error condition
     //
-    bool pred_err = false;
-    current_behavior->checkErrorCondition(in_data_, scheme_peers_, error_condition_);
-    pred_err = *error_condition_;
+    if (error_condition_) {
+        error_condition_->clear();
+    }
+    bool pred_err = current_behavior->checkErrorCondition(in_data_, scheme_peers_, error_condition_);
+    if (error_condition_ && error_condition_->orValue() && error_condition_saved_ && ((*error_condition_saved_) != (*error_condition_))) {
+        *error_condition_saved_ = *error_condition_;
+    }
 
 /*
 TODO: check if all components are in proper state
@@ -420,9 +437,7 @@ TODO: check if all components are in proper state
         //
         // check stop condition
         //
-        bool pred_stop = false;
-        current_behavior->checkStopCondition(in_data_, scheme_peers_, error_condition_);
-        pred_stop = *error_condition_;
+        bool pred_stop = current_behavior->checkStopCondition(in_data_, scheme_peers_);
 
         if (pred_stop) {
             int next_state_index = -1;

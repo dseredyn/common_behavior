@@ -30,6 +30,7 @@
 
 #include "common_behavior/input_data.h"
 #include "common_behavior/buffer_info.h"
+#include "common_behavior/abstract_behavior.h"
 
 #include <string>
 
@@ -104,8 +105,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<int() > getInputDataWaitCycles;
 
   // this method may not be RT-safe
-  RTT::OperationCaller<std::string(boost::shared_ptr<common_behavior::AbstractConditionCause >)> getErrorReasonStr;
-  RTT::OperationCaller<boost::shared_ptr<common_behavior::AbstractConditionCause >()> getErrorReasonSample;
+  RTT::OperationCaller<std::string(AbstractConditionCauseConstPtr)> getErrorReasonStr;
+  RTT::OperationCaller<AbstractConditionCausePtr()> getErrorReasonSample;
 };
 }   // namespace common_behavior
 

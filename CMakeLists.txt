@@ -29,16 +29,27 @@ orocos_use_package( rtt-typekit )
 
 include_directories(${USE_OROCOS_INCLUDE_DIRS} include)
 
+orocos_library(common_behavior
+    src/abstract_behavior.cpp
+)
+target_link_libraries(common_behavior
+    ${catkin_LIBRARIES}
+    ${USE_OROCOS_LIBRARIES}
+    ${orocos_kdl_LIBRARIES}
+    ${OROCOS-RTT_LIBRARIES}
+)
+
 orocos_component(master_component
     src/master_component.cpp
     src/diagnostic_component.cpp
 )
-
 target_link_libraries(master_component
     ${catkin_LIBRARIES}
     ${USE_OROCOS_LIBRARIES}
     ${orocos_kdl_LIBRARIES}
-    ${OROCOS-RTT_LIBRARIES})
+    ${OROCOS-RTT_LIBRARIES}
+    common_behavior
+)
 
 
 find_package(orocos-ocl REQUIRED)
