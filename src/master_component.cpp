@@ -29,6 +29,7 @@
 #include <rtt/Component.hpp>
 #include <rtt/Logger.hpp>
 #include <rtt/extras/SlaveActivity.hpp>
+#include <rtt/os/main.h>
 
 #include <math.h>
 
@@ -96,6 +97,13 @@ private:
     common_behavior::AbstractConditionCausePtr error_condition_saved_;
 
     int input_data_wait_counter_;
+
+
+    RTT::Seconds
+      last_exec_time_,
+      last_exec_period_;
+     RTT::os::TimeService::nsecs last_update_time_;
+
 };
 
 MasterComponent::MasterComponent(const std::string &name) :
@@ -135,7 +143,10 @@ std::string MasterComponent::getDiag() {
 //        }
 //        error_condition_->clear();
     }
-    return "state: " + states_[state_id]->getShortStateName() + ", behavior: " + short_behavior_name + error_str;
+
+    std::ostringstream strs;
+    strs << "state: " << states_[state_id]->getShortStateName() << ", behavior: " << short_behavior_name << error_str << ", period: " << last_exec_period_;
+    return strs.str();
 }
 
 bool MasterComponent::addConmanScheme(RTT::TaskContext* scheme) {
@@ -333,6 +344,22 @@ void MasterComponent::stopHook() {
 
 void MasterComponent::updateHook() {
 
+  // What time is it
+  RTT::os::TimeService::nsecs now = RTT::os::TimeService::Instance()->getNSecs();
+  RTT::os::TimeService::Seconds
+    time = RTT::nsecs_to_Seconds(now),
+    period = RTT::nsecs_to_Seconds(RTT::os::TimeService::Instance()->getNSecs(last_update_time_));
+    
+  // Store update time
+  last_update_time_ = now;
+      
+  // Compute statistics describing how often update is being called
+  last_exec_period_ = time - last_exec_time_;
+  last_exec_time_ = time;
+
+
+
+
     master_service_->initBuffers(in_data_);
 
 //    Logger::In in("MasterComponent::updateHook");
@@ -380,6 +407,7 @@ void MasterComponent::updateHook() {
     //
     // check error condition
     //
+
     if (error_condition_) {
         error_condition_->clear();
     }
@@ -498,6 +526,7 @@ TODO: check if all components are in proper state
         return;
     }
     scheme_->update();
+
 /*
 // TODO: determine if this is needed here
     master_service_->initBuffers(in_data_);
