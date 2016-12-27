@@ -324,7 +324,6 @@ bool MasterComponent::configureHook() {
     error_condition_saved_ = master_service_->getErrorReasonSample();
     if (!error_condition_ || !error_condition_saved_) {
         RTT::log(RTT::Warning) << "Error reason sample was set to NULL. Error condition diagnostics is disabled." << RTT::endlog();
-        return false;
     }
 
     return true;
