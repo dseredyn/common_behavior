@@ -434,7 +434,9 @@ TODO: check if all components are in proper state
                 else {
                     Logger::In in("MasterComponent::updateHook");
                     Logger::log() << Logger::Error << "two or more states have the same initial condition (err): current_state="
-                        << current_state_->getStateName() << Logger::endl;
+                        << current_state_->getStateName()
+                        << ", states: " << states_[i]->getStateName() << ", " << states_[next_state_index]->getStateName()
+                        << Logger::endl;
                     error();
                     return;
                 }
@@ -476,7 +478,9 @@ TODO: check if all components are in proper state
                     else {
                         Logger::In in("MasterComponent::updateHook");
                         Logger::log() << Logger::Error << "two or more states have the same initial condition (stop): current_state="
-                            << current_state_->getStateName() << Logger::endl;
+                            << current_state_->getStateName()
+                            << ", states: " << states_[i]->getStateName() << ", " << states_[next_state_index]->getStateName()
+                            << Logger::endl;
                         error();
                         return;
                     }
