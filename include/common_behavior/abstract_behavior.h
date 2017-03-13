@@ -213,7 +213,7 @@ public:
     }
 };
 
-#define REGISTER_BEHAVIOR( STATE_CLASS ) static common_behavior::BehaviorRegistrar<STATE_CLASS > registrar
+#define REGISTER_BEHAVIOR( STATE_CLASS ) static common_behavior::BehaviorRegistrar<STATE_CLASS > registrar_behavior
 
 };  // namespace common_behavior
 

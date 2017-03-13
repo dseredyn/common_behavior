@@ -40,30 +40,29 @@ namespace common_behavior {
 
 class MasterServiceRequester : public RTT::ServiceRequester {
  public:
-  explicit MasterServiceRequester(RTT::TaskContext *owner) :
-    RTT::ServiceRequester("master", owner),
-    initBuffers("initBuffers"),
-    readStatusPorts("readStatusPorts"),
-    writeStatusPorts("writeStatusPorts"),
-    readCommandPorts("readCommandPorts"),
-    writeCommandPorts("writeCommandPorts"),
-    getDataSample("getDataSample"),
-    getLowerInputBuffers("getLowerInputBuffers"),
-    getUpperInputBuffers("getUpperInputBuffers"),
-    getLowerOutputBuffers("getLowerOutputBuffers"),
-    getUpperOutputBuffers("getUpperOutputBuffers"),
-    getStates("getStates"),
-    getInitialState("getInitialState"),
-    getLatchedConnections("getLatchedConnections"),
-    getInputDataWaitCycles("getInputDataWaitCycles"),
-    getErrorReasonStr("getErrorReasonStr"),
-    getErrorReasonSample("getErrorReasonSample")
+  explicit MasterServiceRequester(RTT::TaskContext *owner)
+    : RTT::ServiceRequester("master", owner)
+    , initBuffers("initBuffers")
+    , readIpcPorts("readIpcPorts")
+    , readInternalPorts("readInternalPorts")
+    , writePorts("writePorts")
+    , getDataSample("getDataSample")
+    , getLowerInputBuffers("getLowerInputBuffers")
+    , getUpperInputBuffers("getUpperInputBuffers")
+    , getLowerOutputBuffers("getLowerOutputBuffers")
+    , getUpperOutputBuffers("getUpperOutputBuffers")
+    , getStates("getStates")
+    , getInitialState("getInitialState")
+    , getLatchedConnections("getLatchedConnections")
+    , getInputDataWaitCycles("getInputDataWaitCycles")
+    , getErrorReasonStr("getErrorReasonStr")
+    , getErrorReasonSample("getErrorReasonSample")
+    , iterationEnd("iterationEnd")
   {
     this->addOperationCaller(initBuffers);
-    this->addOperationCaller(readStatusPorts);
-    this->addOperationCaller(writeStatusPorts);
-    this->addOperationCaller(readCommandPorts);
-    this->addOperationCaller(writeCommandPorts);
+    this->addOperationCaller(readIpcPorts);
+    this->addOperationCaller(readInternalPorts);
+    this->addOperationCaller(writePorts);
     this->addOperationCaller(getDataSample);
 
     this->addOperationCaller(getLowerInputBuffers);
@@ -80,14 +79,15 @@ class MasterServiceRequester : public RTT::ServiceRequester {
 
     this->addOperationCaller(getErrorReasonStr);
     this->addOperationCaller(getErrorReasonSample);
+
+    this->addOperationCaller(iterationEnd);
   }
 
   // OROCOS ports operations
   RTT::OperationCaller<void (boost::shared_ptr<InputData >&)> initBuffers;
-  RTT::OperationCaller<bool(boost::shared_ptr<InputData >&)> readStatusPorts;
-  RTT::OperationCaller<void (boost::shared_ptr<InputData>&)> writeStatusPorts;
-  RTT::OperationCaller<bool(boost::shared_ptr<InputData >&)> readCommandPorts;
-  RTT::OperationCaller<void (boost::shared_ptr<InputData>&)> writeCommandPorts;
+  RTT::OperationCaller<void(boost::shared_ptr<InputData >&)> readIpcPorts;
+  RTT::OperationCaller<void(boost::shared_ptr<InputData >&)> readInternalPorts;
+  RTT::OperationCaller<void (boost::shared_ptr<InputData>&)> writePorts;
   RTT::OperationCaller<boost::shared_ptr<InputData >()> getDataSample;
 
   // subsystem buffers
@@ -107,6 +107,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   // this method may not be RT-safe
   RTT::OperationCaller<std::string(AbstractConditionCauseConstPtr)> getErrorReasonStr;
   RTT::OperationCaller<AbstractConditionCausePtr()> getErrorReasonSample;
+
+  RTT::OperationCaller<void()> iterationEnd;
 };
 }   // namespace common_behavior
 

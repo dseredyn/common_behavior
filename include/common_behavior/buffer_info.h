@@ -33,9 +33,11 @@ namespace common_behavior {
 class BufferInfo {
 public:
     BufferInfo( bool enable_ipc,
-                const std::string& interface_prefix)
+                const std::string& interface_type,
+                const std::string& interface_prefix=std::string())
         : enable_ipc_(enable_ipc)
-        , interface_prefix_(interface_prefix) {
+        , interface_prefix_(interface_prefix)
+        , interface_type_(interface_type) {
     }
 
     // determines if shm ipc interface should be created
@@ -44,26 +46,46 @@ public:
     // the prefix used to generate interface classes with macro
     // ORO_LIST_INTERFACE_COMPONENTS
     std::string interface_prefix_;
+    std::string interface_type_;
+
+    std::string getChannelName() const {
+        if (interface_prefix_.empty()) {
+            return interface_type_;
+        }
+        return interface_prefix_;
+    }
 };
 
 class InputBufferInfo : public BufferInfo {
 public:
     InputBufferInfo(    bool enable_ipc,
-                        bool event_port,
-                        const std::string& interface_prefix)
-        : BufferInfo(enable_ipc, interface_prefix)
-        , event_port_(event_port) {
+                        const std::string& interface_type,
+                        const std::string& interface_prefix,
+                        double event = false,
+                        double period_min = 0.0,
+                        double period_avg = 0.0,
+                        double period_max = 0.0)
+
+        : BufferInfo(enable_ipc, interface_type, interface_prefix)
+        , event_(event)
+        , period_min_(period_min)
+        , period_avg_(period_avg)
+        , period_max_(period_max)
+    {
     }
 
-    // determines if the buffer component is triggered by new data
-    bool event_port_;
+    bool event_;
+    double period_min_;
+    double period_avg_;
+    double period_max_;
 };
 
 class OutputBufferInfo : public BufferInfo {
 public:
     OutputBufferInfo(   bool enable_ipc,
+                        const std::string& interface_type,
                         const std::string& interface_prefix)
-        : BufferInfo(enable_ipc, interface_prefix) {
+        : BufferInfo(enable_ipc, interface_type, interface_prefix) {
     }
 };
 

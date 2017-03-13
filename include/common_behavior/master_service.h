@@ -45,10 +45,9 @@ class MasterService: public RTT::Service {
   explicit MasterService(RTT::TaskContext* owner) :
       RTT::Service("master", owner) {
     this->addOperation("initBuffers", &MasterService::initBuffers, this, RTT::ClientThread);
-    this->addOperation("readStatusPorts", &MasterService::readStatusPorts, this, RTT::ClientThread);
-    this->addOperation("writeStatusPorts", &MasterService::writeStatusPorts, this, RTT::ClientThread);
-    this->addOperation("readCommandPorts", &MasterService::readCommandPorts, this, RTT::ClientThread);
-    this->addOperation("writeCommandPorts", &MasterService::writeCommandPorts, this, RTT::ClientThread);
+    this->addOperation("readIpcPorts", &MasterService::readIpcPorts, this, RTT::ClientThread);
+    this->addOperation("readInternalPorts", &MasterService::readInternalPorts, this, RTT::ClientThread);
+    this->addOperation("writePorts", &MasterService::writePorts, this, RTT::ClientThread);
     this->addOperation("getDataSample", &MasterService::getDataSample, this, RTT::ClientThread);
 
     this->addOperation("getLowerInputBuffers", &MasterService::getLowerInputBuffers, this, RTT::ClientThread);
@@ -65,14 +64,15 @@ class MasterService: public RTT::Service {
 
     this->addOperation("getErrorReasonStr", &MasterService::getErrorReasonStr, this, RTT::ClientThread);
     this->addOperation("getErrorReasonSample", &MasterService::getErrorReasonSample, this, RTT::ClientThread);
+
+    this->addOperation("iterationEnd", &MasterService::iterationEnd, this, RTT::ClientThread);
   }
 
   // OROCOS ports operations
   virtual void initBuffers(boost::shared_ptr<InputData >& in_data) const = 0;
-  virtual bool readStatusPorts(boost::shared_ptr<InputData >& in_data) = 0;
-  virtual void writeStatusPorts(boost::shared_ptr<InputData>& in_data) = 0;
-  virtual bool readCommandPorts(boost::shared_ptr<InputData >& in_data) = 0;
-  virtual void writeCommandPorts(boost::shared_ptr<InputData>& in_data) = 0;
+  virtual void readIpcPorts(boost::shared_ptr<InputData >& in_data) = 0;
+  virtual void readInternalPorts(boost::shared_ptr<InputData >& in_data) = 0;
+  virtual void writePorts(boost::shared_ptr<InputData>& in_data) = 0;
   virtual boost::shared_ptr<InputData > getDataSample() const = 0;
 
   // subsystem buffers
@@ -92,6 +92,8 @@ class MasterService: public RTT::Service {
   // this method may not be RT-safe
   virtual std::string getErrorReasonStr(AbstractConditionCauseConstPtr error_reason) const = 0;
   virtual AbstractConditionCausePtr getErrorReasonSample() const = 0;
+
+  virtual void iterationEnd() = 0;
 };
 
 }   // namespace common_behavior

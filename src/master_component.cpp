@@ -44,6 +44,82 @@
 
 using namespace RTT;
 
+class DiagStateSwitch {
+public:
+    enum Reason {INVALID, INIT, STOP, ERROR};
+    int id_;
+    RTT::os::TimeService::nsecs time_;
+    Reason reason_;
+    common_behavior::AbstractConditionCausePtr cond_reason_;
+
+    static const std::string& getReasonStr(Reason r) {
+        static const std::string inv("INV");
+        static const std::string init("INIT");
+        static const std::string stop("STOP");
+        static const std::string err("ERR");
+        switch (r) {
+        case INIT:
+            return init;
+        case STOP:
+            return stop;
+        case ERROR:
+            return err;
+        }
+        return inv;
+    }
+
+    const std::string& getReasonStr() const {
+        return getReasonStr(reason_);
+    }
+};
+
+class DiagStateSwitchHistory {
+public:
+    DiagStateSwitchHistory()
+        : idx_(0)
+    {}
+
+    void addStateSwitch(int new_state_id, RTT::os::TimeService::nsecs time, DiagStateSwitch::Reason reason, common_behavior::AbstractConditionCausePtr cond_reason = common_behavior::AbstractConditionCausePtr()) {
+        if (h_.size() == 0) {
+            return;
+        }
+        h_[idx_].id_ = new_state_id;
+        h_[idx_].time_ = time;
+        h_[idx_].reason_ = reason;
+        if (cond_reason) {
+            *(h_[idx_].cond_reason_) = *cond_reason;
+        }
+        idx_ = (idx_+1) % h_.size();
+    }
+
+    void setSize(size_t size, RTT::OperationCaller<boost::shared_ptr<common_behavior::AbstractConditionCause>()> common_behavior::MasterServiceRequester::*func, common_behavior::MasterServiceRequester& a) {
+        h_.resize(size);
+        for (int i = 0; i < h_.size(); ++i) {
+            h_[i].id_ = -1;
+            h_[i].reason_ = DiagStateSwitch::INVALID;
+            h_[i].cond_reason_ = (a.*func)();
+        }
+        idx_ = 0;
+    }
+
+    bool getStateSwitchHistory(int idx, DiagStateSwitch &ss) const {
+        if (idx >= h_.size() || h_.size() == 0) {
+            return false;
+        }
+        int i = (idx_-idx-1+h_.size()*2) % h_.size();
+        if (h_[i].reason_ == DiagStateSwitch::INVALID) {
+            return false;
+        }
+        ss = h_[i];
+        return true;
+    }
+
+private:
+
+    std::vector<DiagStateSwitch> h_;
+    int idx_;
+};
+
 class MasterComponent: public RTT::TaskContext {
 public:
     explicit MasterComponent(const std::string &name);
@@ -87,65 +163,71 @@ private:
 
     bool state_switch_;
 
-    int diag_current_state_id_;
+    RTT::base::DataObjectLockFree<DiagStateSwitchHistory > diag_ss_sync_;
+    DiagStateSwitchHistory diag_ss_rt_;
 
     boost::shared_ptr<common_behavior::MasterServiceRequester > master_service_;
 
     boost::shared_ptr<common_behavior::InputData > in_data_;
 
     common_behavior::AbstractConditionCausePtr error_condition_;
-    common_behavior::AbstractConditionCausePtr error_condition_saved_;
 
     int input_data_wait_counter_;
 
 
-    RTT::Seconds
-      last_exec_time_,
-      last_exec_period_;
-     RTT::os::TimeService::nsecs last_update_time_;
+    RTT::Seconds last_exec_time_, last_exec_period_;
+    RTT::os::TimeService::nsecs last_update_time_;
 
+    std::string subsystem_subname_;
+    int state_switch_history_length_;
 };
 
-MasterComponent::MasterComponent(const std::string &name) :
-    TaskContext(name, PreOperational),
-    diag_current_state_id_(0)
+MasterComponent::MasterComponent(const std::string &name)
+    : TaskContext(name, PreOperational)
+//    , diag_current_state_id_(0)
+    , state_switch_history_length_(5)
 {
     this->ports()->addPort("status_test_OUTPORT", port_status_test_out_);
 
     this->addOperation("getDiag", &MasterComponent::getDiag, this, RTT::ClientThread);
 
     this->addOperation("addConmanScheme", &MasterComponent::addConmanScheme, this, RTT::ClientThread);
+
+    addProperty("subsystem_subname", subsystem_subname_);
+    addProperty("state_switch_history_length", state_switch_history_length_);
 }
 
 std::string MasterComponent::getDiag() {
-// this method may not be RT-safe
-    int state_id = diag_current_state_id_;
-    if (state_id < 0 || state_id >= states_.size()) {
-        return "";
-    }
+    std::ostringstream strs;
 
-    std::string short_behavior_name;
-    for (int i = 0; i < behaviors_.size(); ++i) {
-        if (states_[state_id]->getBehaviorName() == behaviors_[i]->getName()) {
-            short_behavior_name = behaviors_[i]->getShortName();
+    strs << "<mcd>";
+    strs << "<h>";
+
+    DiagStateSwitchHistory ss;
+    diag_ss_sync_.Get(ss);
+
+
+    for (int i = 0; ; ++i) {
+        DiagStateSwitch s;
+        if (!ss.getStateSwitchHistory(i, s)) {
             break;
         }
+        RTT::os::TimeService::Seconds switch_interval = RTT::nsecs_to_Seconds(last_update_time_ - s.time_);
+
+        std::string err_str;
+        if (s.cond_reason_) {
+            err_str = master_service_->getErrorReasonStr(s.cond_reason_);
+        }
+        strs << "<ss n=\"" << states_[s.id_]->getShortStateName() << "\" r=\""
+             << s.getReasonStr() << "\" t=\"" << switch_interval << "\" e=\""
+             << err_str << "\" />";
     }
 
-    std::string error_str;
-    if (error_condition_saved_) {
-        error_str = std::string(", error: ") + master_service_->getErrorReasonStr(error_condition_saved_);// + "x: " + master_service_->getErrorReasonStr(error_condition_);
-//        if (error_condition_->orValue()) {
-//            error_str += " err1";
-//        }
-//        if (error_condition_saved_->orValue()) {
-//            error_str += " err2";
-//        }
-//        error_condition_->clear();
-    }
+    strs << "</h>";
 
-    std::ostringstream strs;
-    strs << "state: " << states_[state_id]->getShortStateName() << ", behavior: " << short_behavior_name << error_str << ", period: " << last_exec_period_;
+    strs << "<p>" << last_exec_period_ << "</p>";
+    strs << "</mcd>";
+
     return strs.str();
 }
 
@@ -211,13 +293,18 @@ bool MasterComponent::configureHook() {
         }
     }
 
+    diag_ss_rt_.setSize(state_switch_history_length_, &common_behavior::MasterServiceRequester::getErrorReasonSample, *master_service_);
+
     // select initial state
     for (int i = 0; i < states_.size(); ++i) {
         if (states_[i]->getStateName() == initial_state_name_) {
             current_state_ = states_[i];
-            diag_current_state_id_ = i;
+            diag_ss_rt_.addStateSwitch(i, RTT::os::TimeService::Instance()->getNSecs(), DiagStateSwitch::INIT);
         }
     }
+
+    diag_ss_sync_.data_sample(diag_ss_rt_);
+    diag_ss_sync_.Set(diag_ss_rt_);
 
     if (!current_state_) {
         Logger::log() << Logger::Error << "unknown initial state: " << initial_state_name_ << Logger::endl;
@@ -239,20 +326,6 @@ bool MasterComponent::configureHook() {
         switchable_components_str = switchable_components_str + (switchable_components_str.empty()?"":", ") + (*it);
     }
     Logger::log() << Logger::Info << "switchable components: " << switchable_components_str << Logger::endl;
-
-
-
-/*
-    TaskContext::PeerList l = this->getPeerList();
-    if (l.size() != 1) {
-        Logger::log() << Logger::Error << "wrong number of peers: " << l.size() << ", should be 1" << Logger::endl;
-        return false;
-    }
-
-    TaskContext::PeerList::const_iterator it = l.begin();
-    scheme_ = this->getPeer( (*it) );
-    scheme_->setActivity( new RTT::extras::SlaveActivity(this->getActivity(), scheme_->engine()));
-*/
 
     RTT::OperationInterfacePart *hasBlockOp = scheme_->getOperation("hasBlock");
     if (hasBlockOp == NULL) {
@@ -321,8 +394,7 @@ bool MasterComponent::configureHook() {
     }
 
     error_condition_ = master_service_->getErrorReasonSample();
-    error_condition_saved_ = master_service_->getErrorReasonSample();
-    if (!error_condition_ || !error_condition_saved_) {
+    if (!error_condition_) {
         RTT::log(RTT::Warning) << "Error reason sample was set to NULL. Error condition diagnostics is disabled." << RTT::endlog();
     }
 
@@ -343,56 +415,24 @@ void MasterComponent::stopHook() {
 
 void MasterComponent::updateHook() {
 
-  // What time is it
-  RTT::os::TimeService::nsecs now = RTT::os::TimeService::Instance()->getNSecs();
-  RTT::os::TimeService::Seconds
-    time = RTT::nsecs_to_Seconds(now),
-    period = RTT::nsecs_to_Seconds(RTT::os::TimeService::Instance()->getNSecs(last_update_time_));
+    // What time is it
+    RTT::os::TimeService::nsecs now = RTT::os::TimeService::Instance()->getNSecs();
+    RTT::os::TimeService::Seconds
+        time = RTT::nsecs_to_Seconds(now),
+        period = RTT::nsecs_to_Seconds(RTT::os::TimeService::Instance()->getNSecs(last_update_time_));
     
-  // Store update time
-  last_update_time_ = now;
+    // Store update time
+    last_update_time_ = now;
       
-  // Compute statistics describing how often update is being called
-  last_exec_period_ = time - last_exec_time_;
-  last_exec_time_ = time;
-
-
-
+    // Compute statistics describing how often update is being called
+    last_exec_period_ = time - last_exec_time_;
+    last_exec_time_ = time;
 
     master_service_->initBuffers(in_data_);
+    master_service_->readIpcPorts(in_data_);
+    master_service_->readInternalPorts(in_data_);
 
-//    Logger::In in("MasterComponent::updateHook");
-    bool read_inputs = master_service_->readCommandPorts(in_data_);
-
-    // this should be used in simulation only (on non-RT system)
-    // behavior:
-    // <new data> - no wait
-    // <new data> - no wait
-    // <no data>  - wait (up to wait_cycles)
-    // <no data>  - no wait
-    if (read_inputs) {
-        input_data_wait_counter_ = master_service_->getInputDataWaitCycles();
-//        RTT::log(RTT::Info) << "data ok" << RTT::endlog();
-    }
-    else {
-        if (input_data_wait_counter_ > 0) {
-//            RTT::log(RTT::Info) << "wait " << input_data_wait_counter_ << RTT::endlog();
-            --input_data_wait_counter_;
-            return;
-        }
-    }
-
-    master_service_->writeCommandPorts(in_data_);
-
-// TODO: determine if this is needed here
-//    master_service_->initBuffers(in_data_);
-    if (!master_service_->readStatusPorts(in_data_)) {
-//        RTT::log(RTT::Info) << "readStatusPorts: no data" << RTT::endlog();
-        //error();  // this is not an error
-    }
-    else {
-        master_service_->writeStatusPorts(in_data_);
-    }
+    master_service_->writePorts(in_data_);
 
     // get current behavior
     std::shared_ptr<common_behavior::BehaviorBase > current_behavior;
@@ -411,18 +451,6 @@ void MasterComponent::updateHook() {
         error_condition_->clear();
     }
     bool pred_err = current_behavior->checkErrorCondition(in_data_, scheme_peers_, error_condition_);
-    if (error_condition_ && error_condition_->orValue() && error_condition_saved_ && ((*error_condition_saved_) != (*error_condition_))) {
-        *error_condition_saved_ = *error_condition_;
-    }
-
-/*
-TODO: check if all components are in proper state
-    if (!pred_err) {
-        for (int i = 0; i < scheme_peers_.size(); ++i) {
-            scheme_peers_[i]
-        }
-    }
-*/
 
     if (pred_err) {
         int next_state_index = -1;
@@ -450,14 +478,14 @@ TODO: check if all components are in proper state
             return;
         }
         else {
-            //Logger::log() << Logger::Info << "state_switch from "
-            //   << current_state_->getStateName() << Logger::endl;
+                Logger::log() << Logger::Info << "state_switch (error) from "
+                    << current_state_->getStateName()
+                    << " to " << states_[next_state_index]->getStateName()
+                    << Logger::endl;
 
             current_state_ = states_[next_state_index];
-            diag_current_state_id_ = next_state_index;
-
-            //Logger::log() << Logger::Info << "state_switch to "
-            //   << current_state_->getStateName() << Logger::endl;
+            diag_ss_rt_.addStateSwitch(next_state_index, now, DiagStateSwitch::ERROR, error_condition_);
+            diag_ss_sync_.Set(diag_ss_rt_);
 
             state_switch_ = true;
         }
@@ -494,14 +522,14 @@ TODO: check if all components are in proper state
                 return;
             }
             else {
-                //Logger::log() << Logger::Info << "state_switch from "
-                //   << current_state_->getStateName() << Logger::endl;
+                Logger::log() << Logger::Info << "state_switch (stop) from "
+                    << current_state_->getStateName()
+                    << " to " << states_[next_state_index]->getStateName()
+                    << Logger::endl;
 
                 current_state_ = states_[next_state_index];
-                diag_current_state_id_ = next_state_index;
-
-                //Logger::log() << Logger::Info << "state_switch to "
-                //   << current_state_->getStateName() << Logger::endl;
+                diag_ss_rt_.addStateSwitch(next_state_index, now, DiagStateSwitch::STOP);
+                diag_ss_sync_.Set(diag_ss_rt_);
 
                 state_switch_ = true;
             }
@@ -530,6 +558,8 @@ TODO: check if all components are in proper state
     }
     scheme_->update();
 
+    // iterationEnd callback can be used by e.g. Gazebo simulator
+    master_service_->iterationEnd();
 /*
 // TODO: determine if this is needed here
     master_service_->initBuffers(in_data_);

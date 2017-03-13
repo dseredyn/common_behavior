@@ -5,8 +5,7 @@ project(common_behavior)
 # Find the RTT-ROS package (this transitively includes the Orocos CMake macros)
 find_package(catkin REQUIRED COMPONENTS
   rtt_ros
-  eigen_conversions
-  kdl_conversions
+  rtt_rosclock
   cmake_modules
   diagnostic_msgs
   )
@@ -14,11 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(OROCOS-RTT REQUIRED COMPONENTS rtt-scripting rtt-transport-corba)
 include(${OROCOS-RTT_USE_FILE_PATH}/UseOROCOS-RTT.cmake )
 
-find_package(orocos-ocl REQUIRED)
-
 include_directories(${catkin_INCLUDE_DIRS})
-
-include_directories(${catkin_INCLUDE_DIRS} ${Eigen_INCLUDE_DIRS})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
@@ -51,21 +46,13 @@ target_link_libraries(master_component
     common_behavior
 )
 
-
-find_package(orocos-ocl REQUIRED)
-
-orocos_use_package( ocl-taskbrowser )
-orocos_use_package( ocl-deployment )
-
-link_directories(${orocos-ocl_LIBRARY_DIRS})
-include_directories(${orocos-ocl_INCLUDE_DIRS})
-
 ### Orocos Package Exports and Install Targets ###
 
 # Export package information (replaces catkin_package() macro) 
 orocos_generate_package(
   INCLUDE_DIRS include
-  CATKIN_DEPENDS rtt_ros geometry_msgs std_msgs message_runtime rtt_roscomm common_interfaces
+  DEPENDS_TARGETS rtt_ros rtt_rosclock
 )
+
 
 
