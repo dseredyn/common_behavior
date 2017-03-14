@@ -34,9 +34,9 @@ class BufferInfo {
 public:
     BufferInfo( bool enable_ipc,
                 const std::string& interface_type,
-                const std::string& interface_prefix=std::string())
+                const std::string& interface_alias)
         : enable_ipc_(enable_ipc)
-        , interface_prefix_(interface_prefix)
+        , interface_alias_(interface_alias)
         , interface_type_(interface_type) {
     }
 
@@ -45,28 +45,21 @@ public:
 
     // the prefix used to generate interface classes with macro
     // ORO_LIST_INTERFACE_COMPONENTS
-    std::string interface_prefix_;
+    std::string interface_alias_;
     std::string interface_type_;
-
-    std::string getChannelName() const {
-        if (interface_prefix_.empty()) {
-            return interface_type_;
-        }
-        return interface_prefix_;
-    }
 };
 
 class InputBufferInfo : public BufferInfo {
 public:
     InputBufferInfo(    bool enable_ipc,
                         const std::string& interface_type,
-                        const std::string& interface_prefix,
+                        const std::string& interface_alias,
                         double event = false,
                         double period_min = 0.0,
                         double period_avg = 0.0,
                         double period_max = 0.0)
 
-        : BufferInfo(enable_ipc, interface_type, interface_prefix)
+        : BufferInfo(enable_ipc, interface_type, interface_alias)
         , event_(event)
         , period_min_(period_min)
         , period_avg_(period_avg)
@@ -84,8 +77,8 @@ class OutputBufferInfo : public BufferInfo {
 public:
     OutputBufferInfo(   bool enable_ipc,
                         const std::string& interface_type,
-                        const std::string& interface_prefix)
-        : BufferInfo(enable_ipc, interface_type, interface_prefix) {
+                        const std::string& interface_alias)
+        : BufferInfo(enable_ipc, interface_type, interface_alias) {
     }
 };
 

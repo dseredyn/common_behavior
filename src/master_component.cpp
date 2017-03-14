@@ -178,7 +178,6 @@ private:
     RTT::Seconds last_exec_time_, last_exec_period_;
     RTT::os::TimeService::nsecs last_update_time_;
 
-    std::string subsystem_subname_;
     int state_switch_history_length_;
 };
 
@@ -193,7 +192,6 @@ MasterComponent::MasterComponent(const std::string &name)
 
     this->addOperation("addConmanScheme", &MasterComponent::addConmanScheme, this, RTT::ClientThread);
 
-    addProperty("subsystem_subname", subsystem_subname_);
     addProperty("state_switch_history_length", state_switch_history_length_);
 }
 
