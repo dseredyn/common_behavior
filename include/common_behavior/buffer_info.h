@@ -57,13 +57,15 @@ public:
                         double event = false,
                         double period_min = 0.0,
                         double period_avg = 0.0,
-                        double period_max = 0.0)
+                        double period_max = 0.0,
+                        double period_sim_max = 0.0)
 
         : BufferInfo(enable_ipc, interface_type, interface_alias)
         , event_(event)
         , period_min_(period_min)
         , period_avg_(period_avg)
         , period_max_(period_max)
+        , period_sim_max_(period_sim_max)
     {
     }
 
@@ -71,6 +73,7 @@ public:
     double period_min_;
     double period_avg_;
     double period_max_;
+    double period_sim_max_;
 };
 
 class OutputBufferInfo : public BufferInfo {

@@ -55,7 +55,6 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     , getStates("getStates")
     , getInitialState("getInitialState")
     , getLatchedConnections("getLatchedConnections")
-    , getInputDataWaitCycles("getInputDataWaitCycles")
     , allocatePredicateList("allocatePredicateList")
     , calculatePredicates("calculatePredicates")
     , getPredicatesStr("getPredicatesStr")
@@ -78,8 +77,6 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     this->addOperationCaller(getInitialState);
 
     this->addOperationCaller(getLatchedConnections);
-
-    this->addOperationCaller(getInputDataWaitCycles);
 
     this->addOperationCaller(allocatePredicateList);
     this->addOperationCaller(calculatePredicates);
@@ -109,8 +106,6 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<std::string()> getInitialState;
 
   RTT::OperationCaller<std::vector<std::pair<std::string, std::string > >() > getLatchedConnections;
-
-  RTT::OperationCaller<int() > getInputDataWaitCycles;
 
   RTT::OperationCaller<PredicateListPtr() > allocatePredicateList;
   RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, const std::string&, PredicateListPtr&) > calculatePredicates;

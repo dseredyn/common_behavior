@@ -61,8 +61,6 @@ class MasterService: public RTT::Service {
 
     this->addOperation("getLatchedConnections", &MasterService::getLatchedConnections, this, RTT::ClientThread);
 
-    this->addOperation("getInputDataWaitCycles", &MasterService::getInputDataWaitCycles, this, RTT::ClientThread);
-
     this->addOperation("allocatePredicateList", &MasterService::allocatePredicateList, this, RTT::ClientThread);
     this->addOperation("calculatePredicates", &MasterService::calculatePredicates, this, RTT::ClientThread);
     this->addOperation("getPredicatesStr", &MasterService::getPredicatesStr, this, RTT::ClientThread);
@@ -91,8 +89,6 @@ class MasterService: public RTT::Service {
   virtual std::string getInitialState() const = 0;
 
   virtual std::vector<std::pair<std::string, std::string > > getLatchedConnections() const = 0;
-
-  virtual int getInputDataWaitCycles() const = 0;
 
   virtual PredicateListPtr allocatePredicateList() = 0;
   virtual void calculatePredicates(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, const std::string&, PredicateListPtr&) const = 0;

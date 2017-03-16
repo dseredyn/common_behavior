@@ -172,8 +172,6 @@ private:
 
     common_behavior::AbstractConditionCausePtr error_condition_;
 
-    int input_data_wait_counter_;
-
     common_behavior::PredicateListPtr predicate_list_;
 
     RTT::Seconds last_exec_time_, last_exec_period_;
@@ -414,7 +412,6 @@ bool MasterComponent::configureHook() {
 
 bool MasterComponent::startHook() {
     state_switch_ = true;
-    input_data_wait_counter_ = master_service_->getInputDataWaitCycles();
 
     master_service_->initBuffers(in_data_);
 
