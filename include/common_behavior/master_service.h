@@ -32,6 +32,7 @@
 #include "common_behavior/input_data.h"
 #include "common_behavior/buffer_info.h"
 #include "common_behavior/abstract_behavior.h"
+#include "common_behavior/abstract_predicate_list.h"
 
 #include <rtt/RTT.hpp>
 #include <rtt/Service.hpp>
@@ -62,6 +63,10 @@ class MasterService: public RTT::Service {
 
     this->addOperation("getInputDataWaitCycles", &MasterService::getInputDataWaitCycles, this, RTT::ClientThread);
 
+    this->addOperation("allocatePredicateList", &MasterService::allocatePredicateList, this, RTT::ClientThread);
+    this->addOperation("calculatePredicates", &MasterService::calculatePredicates, this, RTT::ClientThread);
+    this->addOperation("getPredicatesStr", &MasterService::getPredicatesStr, this, RTT::ClientThread);
+
     this->addOperation("getErrorReasonStr", &MasterService::getErrorReasonStr, this, RTT::ClientThread);
     this->addOperation("getErrorReasonSample", &MasterService::getErrorReasonSample, this, RTT::ClientThread);
 
@@ -69,11 +74,11 @@ class MasterService: public RTT::Service {
   }
 
   // OROCOS ports operations
-  virtual void initBuffers(boost::shared_ptr<InputData >& in_data) const = 0;
-  virtual void readIpcPorts(boost::shared_ptr<InputData >& in_data) = 0;
-  virtual void readInternalPorts(boost::shared_ptr<InputData >& in_data) = 0;
-  virtual void writePorts(boost::shared_ptr<InputData>& in_data) = 0;
-  virtual boost::shared_ptr<InputData > getDataSample() const = 0;
+  virtual void initBuffers(InputDataPtr& in_data) const = 0;
+  virtual void readIpcPorts(InputDataPtr& in_data) = 0;
+  virtual void readInternalPorts(InputDataPtr& in_data) = 0;
+  virtual void writePorts(InputDataPtr& in_data) = 0;
+  virtual InputDataPtr getDataSample() const = 0;
 
   // subsystem buffers
   virtual void getLowerInputBuffers(std::vector<InputBufferInfo >&) const = 0;
@@ -88,6 +93,12 @@ class MasterService: public RTT::Service {
   virtual std::vector<std::pair<std::string, std::string > > getLatchedConnections() const = 0;
 
   virtual int getInputDataWaitCycles() const = 0;
+
+  virtual PredicateListPtr allocatePredicateList() = 0;
+  virtual void calculatePredicates(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, const std::string&, PredicateListPtr&) const = 0;
+
+  // this method may not be RT-safe
+  virtual std::string getPredicatesStr(const PredicateListConstPtr&) const = 0;
 
   // this method may not be RT-safe
   virtual std::string getErrorReasonStr(AbstractConditionCauseConstPtr error_reason) const = 0;

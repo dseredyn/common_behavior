@@ -31,6 +31,7 @@
 #include "common_behavior/input_data.h"
 #include "common_behavior/buffer_info.h"
 #include "common_behavior/abstract_behavior.h"
+#include "common_behavior/abstract_predicate_list.h"
 
 #include <string>
 
@@ -55,6 +56,9 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     , getInitialState("getInitialState")
     , getLatchedConnections("getLatchedConnections")
     , getInputDataWaitCycles("getInputDataWaitCycles")
+    , allocatePredicateList("allocatePredicateList")
+    , calculatePredicates("calculatePredicates")
+    , getPredicatesStr("getPredicatesStr")
     , getErrorReasonStr("getErrorReasonStr")
     , getErrorReasonSample("getErrorReasonSample")
     , iterationEnd("iterationEnd")
@@ -77,6 +81,10 @@ class MasterServiceRequester : public RTT::ServiceRequester {
 
     this->addOperationCaller(getInputDataWaitCycles);
 
+    this->addOperationCaller(allocatePredicateList);
+    this->addOperationCaller(calculatePredicates);
+    this->addOperationCaller(getPredicatesStr);
+
     this->addOperationCaller(getErrorReasonStr);
     this->addOperationCaller(getErrorReasonSample);
 
@@ -84,11 +92,11 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   }
 
   // OROCOS ports operations
-  RTT::OperationCaller<void (boost::shared_ptr<InputData >&)> initBuffers;
-  RTT::OperationCaller<void(boost::shared_ptr<InputData >&)> readIpcPorts;
-  RTT::OperationCaller<void(boost::shared_ptr<InputData >&)> readInternalPorts;
-  RTT::OperationCaller<void (boost::shared_ptr<InputData>&)> writePorts;
-  RTT::OperationCaller<boost::shared_ptr<InputData >()> getDataSample;
+  RTT::OperationCaller<void (InputDataPtr&)> initBuffers;
+  RTT::OperationCaller<void(InputDataPtr&)> readIpcPorts;
+  RTT::OperationCaller<void(InputDataPtr&)> readInternalPorts;
+  RTT::OperationCaller<void (InputDataPtr&)> writePorts;
+  RTT::OperationCaller<InputDataPtr()> getDataSample;
 
   // subsystem buffers
   RTT::OperationCaller<void(std::vector<InputBufferInfo >&)> getLowerInputBuffers;
@@ -103,6 +111,10 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<std::vector<std::pair<std::string, std::string > >() > getLatchedConnections;
 
   RTT::OperationCaller<int() > getInputDataWaitCycles;
+
+  RTT::OperationCaller<PredicateListPtr() > allocatePredicateList;
+  RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, const std::string&, PredicateListPtr&) > calculatePredicates;
+  RTT::OperationCaller<std::string(const PredicateListConstPtr&) > getPredicatesStr;
 
   // this method may not be RT-safe
   RTT::OperationCaller<std::string(AbstractConditionCauseConstPtr)> getErrorReasonStr;

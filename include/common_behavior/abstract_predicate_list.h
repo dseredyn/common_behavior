@@ -25,22 +25,24 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef COMMON_BEHAVIOR_INPUT_DATA_H__
-#define COMMON_BEHAVIOR_INPUT_DATA_H__
+#ifndef __ABSTRACT_PREDICATE_LIST_H__
+#define __ABSTRACT_PREDICATE_LIST_H__
 
 #include <boost/shared_ptr.hpp>
 
 namespace common_behavior {
 
-class InputData {
+class PredicateList {
 public:
+    bool IN_ERROR;
 
+    virtual PredicateList& operator=(const PredicateList& arg) = 0;
 };
 
-typedef boost::shared_ptr<InputData > InputDataPtr;
-typedef boost::shared_ptr<const InputData > InputDataConstPtr;
+typedef boost::shared_ptr<PredicateList > PredicateListPtr;
+typedef boost::shared_ptr<const PredicateList > PredicateListConstPtr;
 
 };  // namespace common_behavior
 
-#endif  // COMMON_BEHAVIOR_INPUT_DATA_H__
+#endif  // __ABSTRACT_PREDICATE_LIST_H__
 

@@ -29,6 +29,7 @@
 #define __ABSTRACT_BEHAVIOR_H__
 
 #include "common_behavior/input_data.h"
+#include "common_behavior/abstract_predicate_list.h"
 
 #include <map>
 #include <vector>
@@ -43,8 +44,6 @@ public:
     virtual bool isEqual(const AbstractConditionCause& c) const = 0;
     virtual bool orValue() const = 0;
     virtual void clear() = 0;
-//    virtual void setBit(size_t bit_idx, bool value) = 0;
-//    virtual bool getBit(int bit_idx) const = 0;
     virtual AbstractConditionCause& operator=(const AbstractConditionCause& arg) = 0;
 };
 
@@ -115,14 +114,8 @@ private:
 class BehaviorBase {
 public:
 
-    virtual bool checkErrorCondition(
-                const boost::shared_ptr<InputData >& in_data,
-                const std::vector<RTT::TaskContext*> &components,
-                boost::shared_ptr<AbstractConditionCause > result = boost::shared_ptr<AbstractConditionCause >()) const = 0;
-
-    virtual bool checkStopCondition(
-                const boost::shared_ptr<InputData >& in_data,
-                const std::vector<RTT::TaskContext*> &components) const = 0;
+    virtual bool checkErrorCondition(const PredicateListConstPtr& pred_list) const = 0;
+    virtual bool checkStopCondition(const PredicateListConstPtr& pred_list) const = 0;
 
     const std::string& getName() const {
         return name_;
@@ -213,7 +206,10 @@ public:
     }
 };
 
-#define REGISTER_BEHAVIOR( STATE_CLASS ) static common_behavior::BehaviorRegistrar<STATE_CLASS > registrar_behavior
+#define LITERAL_registrar_behavior_(X) registrar_behavior_##X
+#define EXPAND_registrar_behavior_(X) LITERAL_registrar_behavior_(X)
+ 
+#define REGISTER_BEHAVIOR( STATE_CLASS ) static common_behavior::BehaviorRegistrar<STATE_CLASS > EXPAND_registrar_behavior_(__LINE__)
 
 };  // namespace common_behavior
 

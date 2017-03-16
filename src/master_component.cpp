@@ -50,7 +50,7 @@ public:
     int id_;
     RTT::os::TimeService::nsecs time_;
     Reason reason_;
-    common_behavior::AbstractConditionCausePtr cond_reason_;
+    common_behavior::PredicateListPtr pred_;
 
     static const std::string& getReasonStr(Reason r) {
         static const std::string inv("INV");
@@ -79,25 +79,25 @@ public:
         : idx_(0)
     {}
 
-    void addStateSwitch(int new_state_id, RTT::os::TimeService::nsecs time, DiagStateSwitch::Reason reason, common_behavior::AbstractConditionCausePtr cond_reason = common_behavior::AbstractConditionCausePtr()) {
+    void addStateSwitch(int new_state_id, RTT::os::TimeService::nsecs time, DiagStateSwitch::Reason reason, common_behavior::PredicateListConstPtr pred = common_behavior::PredicateListConstPtr()) {
         if (h_.size() == 0) {
             return;
         }
         h_[idx_].id_ = new_state_id;
         h_[idx_].time_ = time;
         h_[idx_].reason_ = reason;
-        if (cond_reason) {
-            *(h_[idx_].cond_reason_) = *cond_reason;
+        if (pred) {
+            *(h_[idx_].pred_) = *pred;
         }
         idx_ = (idx_+1) % h_.size();
     }
 
-    void setSize(size_t size, RTT::OperationCaller<boost::shared_ptr<common_behavior::AbstractConditionCause>()> common_behavior::MasterServiceRequester::*func, common_behavior::MasterServiceRequester& a) {
+    void setSize(size_t size, RTT::OperationCaller<common_behavior::PredicateListPtr()> common_behavior::MasterServiceRequester::*func, common_behavior::MasterServiceRequester& a) {
         h_.resize(size);
         for (int i = 0; i < h_.size(); ++i) {
             h_[i].id_ = -1;
             h_[i].reason_ = DiagStateSwitch::INVALID;
-            h_[i].cond_reason_ = (a.*func)();
+            h_[i].pred_ = (a.*func)();
         }
         idx_ = 0;
     }
@@ -174,6 +174,7 @@ private:
 
     int input_data_wait_counter_;
 
+    common_behavior::PredicateListPtr predicate_list_;
 
     RTT::Seconds last_exec_time_, last_exec_period_;
     RTT::os::TimeService::nsecs last_update_time_;
@@ -183,7 +184,6 @@ private:
 
 MasterComponent::MasterComponent(const std::string &name)
     : TaskContext(name, PreOperational)
-//    , diag_current_state_id_(0)
     , state_switch_history_length_(5)
 {
     this->ports()->addPort("status_test_OUTPORT", port_status_test_out_);
@@ -213,10 +213,17 @@ std::string MasterComponent::getDiag() {
         RTT::os::TimeService::Seconds switch_interval = RTT::nsecs_to_Seconds(last_update_time_ - s.time_);
 
         std::string err_str;
-        if (s.cond_reason_) {
-            err_str = master_service_->getErrorReasonStr(s.cond_reason_);
+        if (s.pred_) {
+            err_str = master_service_->getPredicatesStr(s.pred_);
         }
-        strs << "<ss n=\"" << states_[s.id_]->getShortStateName() << "\" r=\""
+        std::string state_name;
+        if (s.id_ >= 0) {
+            state_name = states_[s.id_]->getShortStateName();
+        }
+        else {
+            state_name = "INV_STATE";
+        }
+        strs << "<ss n=\"" << state_name << "\" r=\""
              << s.getReasonStr() << "\" t=\"" << switch_interval << "\" e=\""
              << err_str << "\" />";
     }
@@ -240,6 +247,12 @@ bool MasterComponent::configureHook() {
     master_service_ = this->getProvider<common_behavior::MasterServiceRequester >("master");
     if (!master_service_) {
         RTT::log(RTT::Error) << "Unable to load common_behavior::MasterService" << RTT::endlog();
+        return false;
+    }
+
+    predicate_list_ = master_service_->allocatePredicateList();
+    if (!predicate_list_) {
+        Logger::log() << Logger::Error << "could not allocate predicate list" << Logger::endl;
         return false;
     }
 
@@ -291,7 +304,7 @@ bool MasterComponent::configureHook() {
         }
     }
 
-    diag_ss_rt_.setSize(state_switch_history_length_, &common_behavior::MasterServiceRequester::getErrorReasonSample, *master_service_);
+    diag_ss_rt_.setSize(state_switch_history_length_, &common_behavior::MasterServiceRequester::allocatePredicateList, *master_service_);
 
     // select initial state
     for (int i = 0; i < states_.size(); ++i) {
@@ -441,6 +454,8 @@ void MasterComponent::updateHook() {
         }
     }
 
+    master_service_->calculatePredicates(in_data_, scheme_peers_, current_state_->getStateName(), predicate_list_);
+
     //
     // check error condition
     //
@@ -448,12 +463,14 @@ void MasterComponent::updateHook() {
     if (error_condition_) {
         error_condition_->clear();
     }
-    bool pred_err = current_behavior->checkErrorCondition(in_data_, scheme_peers_, error_condition_);
+
+    bool pred_err = current_behavior->checkErrorCondition(predicate_list_);
+    predicate_list_->IN_ERROR = pred_err;
 
     if (pred_err) {
         int next_state_index = -1;
         for (int i = 0; i < states_.size(); ++i) {
-            if ( states_[i]->checkInitialCondition(in_data_, scheme_peers_, current_state_->getStateName(), true) ) {
+            if ( states_[i]->checkInitialCondition(predicate_list_) ) {
                 if (next_state_index == -1) {
                     next_state_index = i;
                 }
@@ -461,8 +478,9 @@ void MasterComponent::updateHook() {
                     Logger::In in("MasterComponent::updateHook");
                     Logger::log() << Logger::Error << "two or more states have the same initial condition (err): current_state="
                         << current_state_->getStateName()
-                        << ", states: " << states_[i]->getStateName() << ", " << states_[next_state_index]->getStateName()
+                        << ", states: " << states_[i]->getStateName() << ", " << states_[next_state_index]->getStateName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_)
                         << Logger::endl;
+                    diag_ss_rt_.addStateSwitch(-1, now, DiagStateSwitch::ERROR, predicate_list_);
                     error();
                     return;
                 }
@@ -471,7 +489,8 @@ void MasterComponent::updateHook() {
         if (next_state_index == -1) {
             Logger::In in("MasterComponent::updateHook");
             Logger::log() << Logger::Error << "cannot switch to new state (initial condition, err): current_state="
-                << current_state_->getStateName() << Logger::endl;
+                << current_state_->getStateName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_) << Logger::endl;
+            diag_ss_rt_.addStateSwitch(-1, now, DiagStateSwitch::ERROR, predicate_list_);
             error();
             return;
         }
@@ -482,7 +501,7 @@ void MasterComponent::updateHook() {
                     << Logger::endl;
 
             current_state_ = states_[next_state_index];
-            diag_ss_rt_.addStateSwitch(next_state_index, now, DiagStateSwitch::ERROR, error_condition_);
+            diag_ss_rt_.addStateSwitch(next_state_index, now, DiagStateSwitch::ERROR, predicate_list_);
             diag_ss_sync_.Set(diag_ss_rt_);
 
             state_switch_ = true;
@@ -492,12 +511,12 @@ void MasterComponent::updateHook() {
         //
         // check stop condition
         //
-        bool pred_stop = current_behavior->checkStopCondition(in_data_, scheme_peers_);
+        bool pred_stop = current_behavior->checkStopCondition(predicate_list_);
 
         if (pred_stop) {
             int next_state_index = -1;
             for (int i = 0; i < states_.size(); ++i) {
-                if ( states_[i]->checkInitialCondition(in_data_, scheme_peers_, current_state_->getStateName(), false) ) {
+                if ( states_[i]->checkInitialCondition(predicate_list_) ) {
                     if (next_state_index == -1) {
                         next_state_index = i;
                     }
@@ -505,8 +524,9 @@ void MasterComponent::updateHook() {
                         Logger::In in("MasterComponent::updateHook");
                         Logger::log() << Logger::Error << "two or more states have the same initial condition (stop): current_state="
                             << current_state_->getStateName()
-                            << ", states: " << states_[i]->getStateName() << ", " << states_[next_state_index]->getStateName()
+                            << ", states: " << states_[i]->getStateName() << ", " << states_[next_state_index]->getStateName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_)
                             << Logger::endl;
+                        diag_ss_rt_.addStateSwitch(-1, now, DiagStateSwitch::STOP, predicate_list_);
                         error();
                         return;
                     }
@@ -515,7 +535,8 @@ void MasterComponent::updateHook() {
             if (next_state_index == -1) {
                 Logger::In in("MasterComponent::updateHook");
                 Logger::log() << Logger::Error << "cannot switch to new state (initial condition, stop): current_state="
-                    << current_state_->getStateName() << Logger::endl;
+                    << current_state_->getStateName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_) << Logger::endl;
+                diag_ss_rt_.addStateSwitch(-1, now, DiagStateSwitch::STOP, predicate_list_);
                 error();
                 return;
             }
@@ -526,7 +547,7 @@ void MasterComponent::updateHook() {
                     << Logger::endl;
 
                 current_state_ = states_[next_state_index];
-                diag_ss_rt_.addStateSwitch(next_state_index, now, DiagStateSwitch::STOP);
+                diag_ss_rt_.addStateSwitch(next_state_index, now, DiagStateSwitch::STOP, predicate_list_);
                 diag_ss_sync_.Set(diag_ss_rt_);
 
                 state_switch_ = true;

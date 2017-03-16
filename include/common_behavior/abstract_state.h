@@ -41,11 +41,7 @@ namespace common_behavior {
 class StateBase {
 public:
 
-    virtual bool checkInitialCondition(
-            const boost::shared_ptr<InputData >& in_data,
-            const std::vector<RTT::TaskContext*> &components,
-            const std::string& prev_state_name,
-            bool in_error) const = 0;
+    virtual bool checkInitialCondition(const PredicateListConstPtr& pred_list) const = 0;
 
     const std::string& getStateName() const {
         return state_name_;
@@ -131,7 +127,10 @@ public:
     }
 };
 
-#define REGISTER_STATE( STATE_CLASS ) static common_behavior::StateRegistrar<STATE_CLASS > registrar_state
+#define LITERAL_registrar_state_(X) registrar_state_##X
+#define EXPAND_registrar_state_(X) LITERAL_registrar_state_(X)
+
+#define REGISTER_STATE( STATE_CLASS ) static common_behavior::StateRegistrar<STATE_CLASS > EXPAND_registrar_state_(__LINE__)
 
 };  // namespace common_behavior
 
