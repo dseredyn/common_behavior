@@ -52,12 +52,13 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     , getUpperInputBuffers("getUpperInputBuffers")
     , getLowerOutputBuffers("getLowerOutputBuffers")
     , getUpperOutputBuffers("getUpperOutputBuffers")
-    , getStates("getStates")
-    , getInitialState("getInitialState")
+    , getBehaviors("getBehaviors")
+    , getInitialBehaviors("getInitialBehaviors")
     , getLatchedConnections("getLatchedConnections")
     , allocatePredicateList("allocatePredicateList")
     , calculatePredicates("calculatePredicates")
     , getPredicatesStr("getPredicatesStr")
+    , allocateOutputScope("allocateOutputScope")
     , getErrorReasonStr("getErrorReasonStr")
     , getErrorReasonSample("getErrorReasonSample")
     , iterationEnd("iterationEnd")
@@ -73,14 +74,16 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     this->addOperationCaller(getLowerOutputBuffers);
     this->addOperationCaller(getUpperOutputBuffers);
 
-    this->addOperationCaller(getStates);
-    this->addOperationCaller(getInitialState);
+    this->addOperationCaller(getBehaviors);
+    this->addOperationCaller(getInitialBehaviors);
 
     this->addOperationCaller(getLatchedConnections);
 
     this->addOperationCaller(allocatePredicateList);
     this->addOperationCaller(calculatePredicates);
     this->addOperationCaller(getPredicatesStr);
+
+    this->addOperationCaller(allocateOutputScope);
 
     this->addOperationCaller(getErrorReasonStr);
     this->addOperationCaller(getErrorReasonSample);
@@ -102,14 +105,16 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<void(std::vector<OutputBufferInfo >&)> getUpperOutputBuffers;
 
   // FSM parameters
-  RTT::OperationCaller<std::vector<std::string >()> getStates;
-  RTT::OperationCaller<std::string()> getInitialState;
+  RTT::OperationCaller<std::vector<std::string >()> getBehaviors;
+  RTT::OperationCaller<std::vector<std::string >()> getInitialBehaviors;
 
   RTT::OperationCaller<std::vector<std::pair<std::string, std::string > >() > getLatchedConnections;
 
   RTT::OperationCaller<PredicateListPtr() > allocatePredicateList;
-  RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, const std::string&, PredicateListPtr&) > calculatePredicates;
+  RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, PredicateListPtr&) > calculatePredicates;
   RTT::OperationCaller<std::string(const PredicateListConstPtr&) > getPredicatesStr;
+
+  RTT::OperationCaller<OutputScopeBasePtr() > allocateOutputScope;
 
   // this method may not be RT-safe
   RTT::OperationCaller<std::string(AbstractConditionCauseConstPtr)> getErrorReasonStr;

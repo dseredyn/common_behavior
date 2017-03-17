@@ -56,14 +56,16 @@ class MasterService: public RTT::Service {
     this->addOperation("getLowerOutputBuffers", &MasterService::getLowerOutputBuffers, this, RTT::ClientThread);
     this->addOperation("getUpperOutputBuffers", &MasterService::getUpperOutputBuffers, this, RTT::ClientThread);
 
-    this->addOperation("getStates", &MasterService::getStates, this, RTT::ClientThread);
-    this->addOperation("getInitialState", &MasterService::getInitialState, this, RTT::ClientThread);
+    this->addOperation("getBehaviors", &MasterService::getBehaviors, this, RTT::ClientThread);
+    this->addOperation("getInitialBehaviors", &MasterService::getInitialBehaviors, this, RTT::ClientThread);
 
     this->addOperation("getLatchedConnections", &MasterService::getLatchedConnections, this, RTT::ClientThread);
 
     this->addOperation("allocatePredicateList", &MasterService::allocatePredicateList, this, RTT::ClientThread);
     this->addOperation("calculatePredicates", &MasterService::calculatePredicates, this, RTT::ClientThread);
     this->addOperation("getPredicatesStr", &MasterService::getPredicatesStr, this, RTT::ClientThread);
+
+    this->addOperation("allocateOutputScope", &MasterService::allocateOutputScope, this, RTT::ClientThread);
 
     this->addOperation("getErrorReasonStr", &MasterService::getErrorReasonStr, this, RTT::ClientThread);
     this->addOperation("getErrorReasonSample", &MasterService::getErrorReasonSample, this, RTT::ClientThread);
@@ -85,16 +87,18 @@ class MasterService: public RTT::Service {
   virtual void getUpperOutputBuffers(std::vector<OutputBufferInfo >&) const = 0;
 
   // FSM parameters
-  virtual std::vector<std::string > getStates() const = 0;
-  virtual std::string getInitialState() const = 0;
+  virtual std::vector<std::string > getBehaviors() const = 0;
+  virtual std::vector<std::string > getInitialBehaviors() const = 0;
 
   virtual std::vector<std::pair<std::string, std::string > > getLatchedConnections() const = 0;
 
   virtual PredicateListPtr allocatePredicateList() = 0;
-  virtual void calculatePredicates(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, const std::string&, PredicateListPtr&) const = 0;
+  virtual void calculatePredicates(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, PredicateListPtr&) const = 0;
 
   // this method may not be RT-safe
   virtual std::string getPredicatesStr(const PredicateListConstPtr&) const = 0;
+
+  virtual OutputScopeBasePtr allocateOutputScope() = 0;
 
   // this method may not be RT-safe
   virtual std::string getErrorReasonStr(AbstractConditionCauseConstPtr error_reason) const = 0;

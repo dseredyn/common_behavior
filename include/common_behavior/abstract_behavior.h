@@ -111,11 +111,29 @@ private:
     boost::array<bool, N > bitfield_;
 };
 
+class OutputScopeBase {
+public:
+    virtual bool isCompatible(OutputScopeBase&) const = 0;
+
+    virtual void add(OutputScopeBase&) = 0;
+
+    virtual void substract(OutputScopeBase&) = 0;
+};
+
+typedef boost::shared_ptr<OutputScopeBase > OutputScopeBasePtr;
+typedef boost::shared_ptr<const OutputScopeBase > OutputScopeBaseConstPtr;
+
 class BehaviorBase {
 public:
 
+    virtual bool checkInitialCondition(const PredicateListConstPtr& pred_list) const = 0;
     virtual bool checkErrorCondition(const PredicateListConstPtr& pred_list) const = 0;
     virtual bool checkStopCondition(const PredicateListConstPtr& pred_list) const = 0;
+    virtual OutputScopeBaseConstPtr getOutputScope() const = 0;
+
+    bool isInitial() const {
+        return is_initial_;
+    }
 
     const std::string& getName() const {
         return name_;
@@ -133,12 +151,14 @@ public:
         running_.push_back(name);
     }
 
-   
 protected:
     explicit BehaviorBase(const std::string& name, const std::string& short_name)
         : name_(name)
         , short_name_(short_name)
+        , is_initial_(false)
     { }
+
+    bool is_initial_;
 
 private:
     std::vector<std::string > running_;

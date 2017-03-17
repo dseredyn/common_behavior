@@ -36,15 +36,14 @@
 #include <vector>
 #include <string>
 
-#include "common_behavior/abstract_behavior.h"
-#include "common_behavior/abstract_state.h"
+//#include "common_behavior/abstract_behavior.h"
 #include "common_behavior/input_data.h"
 #include "common_behavior/master_service_requester.h"
 #include "common_behavior/master_service.h"
 
 using namespace RTT;
 
-class DiagStateSwitch {
+class DiagBehaviorSwitch {
 public:
     enum Reason {INVALID, INIT, STOP, ERROR};
     int id_;
@@ -73,17 +72,17 @@ public:
     }
 };
 
-class DiagStateSwitchHistory {
+class DiagBehaviorSwitchHistory {
 public:
-    DiagStateSwitchHistory()
+    DiagBehaviorSwitchHistory()
         : idx_(0)
     {}
 
-    void addStateSwitch(int new_state_id, RTT::os::TimeService::nsecs time, DiagStateSwitch::Reason reason, common_behavior::PredicateListConstPtr pred = common_behavior::PredicateListConstPtr()) {
+    void addBehaviorSwitch(int new_behavior_id, RTT::os::TimeService::nsecs time, DiagBehaviorSwitch::Reason reason, common_behavior::PredicateListConstPtr pred = common_behavior::PredicateListConstPtr()) {
         if (h_.size() == 0) {
             return;
         }
-        h_[idx_].id_ = new_state_id;
+        h_[idx_].id_ = new_behavior_id;
         h_[idx_].time_ = time;
         h_[idx_].reason_ = reason;
         if (pred) {
@@ -96,18 +95,18 @@ public:
         h_.resize(size);
         for (int i = 0; i < h_.size(); ++i) {
             h_[i].id_ = -1;
-            h_[i].reason_ = DiagStateSwitch::INVALID;
+            h_[i].reason_ = DiagBehaviorSwitch::INVALID;
             h_[i].pred_ = (a.*func)();
         }
         idx_ = 0;
     }
 
-    bool getStateSwitchHistory(int idx, DiagStateSwitch &ss) const {
+    bool getBehaviorSwitchHistory(int idx, DiagBehaviorSwitch &ss) const {
         if (idx >= h_.size() || h_.size() == 0) {
             return false;
         }
         int i = (idx_-idx-1+h_.size()*2) % h_.size();
-        if (h_[i].reason_ == DiagStateSwitch::INVALID) {
+        if (h_[i].reason_ == DiagBehaviorSwitch::INVALID) {
             return false;
         }
         ss = h_[i];
@@ -116,7 +115,7 @@ public:
 
 private:
 
-    std::vector<DiagStateSwitch> h_;
+    std::vector<DiagBehaviorSwitch> h_;
     int idx_;
 };
 
@@ -137,18 +136,10 @@ public:
     bool addConmanScheme(RTT::TaskContext* scheme);
 
 private:
-    // parameters
-    std::vector<std::string > state_names_;
-    std::string initial_state_name_;
-
-    std::vector<std::string > behavior_names_;
-
-    RTT::OutputPort<uint32_t> port_status_test_out_;
-
     std::vector<std::shared_ptr<common_behavior::BehaviorBase > > behaviors_;
+    std::shared_ptr<common_behavior::BehaviorBase > current_behavior_;
 
-    std::vector<std::shared_ptr<common_behavior::StateBase > > states_;
-    std::shared_ptr<common_behavior::StateBase > current_state_;
+    common_behavior::OutputScopeBasePtr output_scope_;
 
     // pointer to conman scheme TaskContext
     TaskContext *scheme_;
@@ -161,10 +152,10 @@ private:
     std::vector<TaskContext* > scheme_peers_;
     std::vector<std::vector<bool> > is_running_;
 
-    bool state_switch_;
+    bool behavior_switch_;
 
-    RTT::base::DataObjectLockFree<DiagStateSwitchHistory > diag_ss_sync_;
-    DiagStateSwitchHistory diag_ss_rt_;
+    RTT::base::DataObjectLockFree<DiagBehaviorSwitchHistory > diag_bs_sync_;
+    DiagBehaviorSwitchHistory diag_ss_rt_;
 
     boost::shared_ptr<common_behavior::MasterServiceRequester > master_service_;
 
@@ -177,20 +168,18 @@ private:
     RTT::Seconds last_exec_time_, last_exec_period_;
     RTT::os::TimeService::nsecs last_update_time_;
 
-    int state_switch_history_length_;
+    int behavior_switch_history_length_;
 };
 
 MasterComponent::MasterComponent(const std::string &name)
     : TaskContext(name, PreOperational)
-    , state_switch_history_length_(5)
+    , behavior_switch_history_length_(5)
 {
-    this->ports()->addPort("status_test_OUTPORT", port_status_test_out_);
-
     this->addOperation("getDiag", &MasterComponent::getDiag, this, RTT::ClientThread);
 
     this->addOperation("addConmanScheme", &MasterComponent::addConmanScheme, this, RTT::ClientThread);
 
-    addProperty("state_switch_history_length", state_switch_history_length_);
+    addProperty("behavior_switch_history_length", behavior_switch_history_length_);
 }
 
 std::string MasterComponent::getDiag() {
@@ -199,13 +188,13 @@ std::string MasterComponent::getDiag() {
     strs << "<mcd>";
     strs << "<h>";
 
-    DiagStateSwitchHistory ss;
-    diag_ss_sync_.Get(ss);
+    DiagBehaviorSwitchHistory ss;
+    diag_bs_sync_.Get(ss);
 
 
     for (int i = 0; ; ++i) {
-        DiagStateSwitch s;
-        if (!ss.getStateSwitchHistory(i, s)) {
+        DiagBehaviorSwitch s;
+        if (!ss.getBehaviorSwitchHistory(i, s)) {
             break;
         }
         RTT::os::TimeService::Seconds switch_interval = RTT::nsecs_to_Seconds(last_update_time_ - s.time_);
@@ -214,14 +203,14 @@ std::string MasterComponent::getDiag() {
         if (s.pred_) {
             err_str = master_service_->getPredicatesStr(s.pred_);
         }
-        std::string state_name;
+        std::string behavior_name;
         if (s.id_ >= 0) {
-            state_name = states_[s.id_]->getShortStateName();
+            behavior_name = behaviors_[s.id_]->getShortName();
         }
         else {
-            state_name = "INV_STATE";
+            behavior_name = "INV_BEH";
         }
-        strs << "<ss n=\"" << state_name << "\" r=\""
+        strs << "<ss n=\"" << behavior_name << "\" r=\""
              << s.getReasonStr() << "\" t=\"" << switch_interval << "\" e=\""
              << err_str << "\" />";
     }
@@ -254,30 +243,45 @@ bool MasterComponent::configureHook() {
         return false;
     }
 
-    state_names_ = master_service_->getStates();
-    initial_state_name_ = master_service_->getInitialState();
-
-    for (auto it = common_behavior::StateFactory::Instance()->getStates().begin();
-        it != common_behavior::StateFactory::Instance()->getStates().end(); ++it)
-    {
-        Logger::log() << Logger::Info << "state: " << it->first << Logger::endl;
+    output_scope_ = master_service_->allocateOutputScope();
+    if (!output_scope_) {
+        Logger::log() << Logger::Error << "could not allocate output scope" << Logger::endl;
+        return false;
     }
 
-    // retrieve states list
-    for (int i = 0; i < state_names_.size(); ++i) {
-        auto b_ptr = common_behavior::StateFactory::Instance()->Create( state_names_[i] );
+    std::vector<std::string > behavior_names_ = master_service_->getBehaviors();
+
+//    std::vector<std::string > initial_behavior_names_ = master_service_->getInitialBehaviors();
+
+    Logger::log() << Logger::Info << "Known behaviors: " << Logger::endl;
+    for (auto it = common_behavior::BehaviorFactory::Instance()->getBehaviors().begin();
+        it != common_behavior::BehaviorFactory::Instance()->getBehaviors().end(); ++it)
+    {
+        Logger::log() << Logger::Info << it->first << Logger::endl;
+    }
+
+//    Logger::log() << Logger::Info << "Initial behaviors: " << Logger::endl;
+//    for (int i = 0; i < initial_behavior_names_.size(); ++i) {
+//        Logger::log() << Logger::Info << initial_behavior_names_[i] << Logger::endl;
+//    }
+
+    // retrieve behaviors list
+    Logger::log() << Logger::Info << "Used behaviors: " << Logger::endl;
+    for (int i = 0; i < behavior_names_.size(); ++i) {
+        auto b_ptr = common_behavior::BehaviorFactory::Instance()->Create( behavior_names_[i] );
         if (b_ptr) {
-            states_.push_back(b_ptr);
+            Logger::log() << Logger::Info << behavior_names_[i] << ", short name: " << b_ptr->getShortName() << ", initial: " << (b_ptr->isInitial()?"true":"false") << Logger::endl;
+            behaviors_.push_back(b_ptr);
         }
         else {
-            Logger::log() << Logger::Error << "unknown state: " << state_names_[i] << Logger::endl;
+            Logger::log() << Logger::Error << "unknown behavior: " << behavior_names_[i] << Logger::endl;
             return false;
         }
     }
-
+/*
     // retrieve behavior names
-    for (int i = 0; i < states_.size(); ++i) {
-        const std::string& behavior_name = states_[i]->getBehaviorName();
+    for (int i = 0; i < behaviors_.size(); ++i) {
+        const std::string& behavior_name = behaviors_[i]->getName();
         bool add = true;
         for (int j = 0; j < behavior_names_.size(); ++j) {
             if (behavior_names_[j] == behavior_name) {
@@ -289,36 +293,25 @@ bool MasterComponent::configureHook() {
             behavior_names_.push_back(behavior_name);
         }
     }
+*/
+    diag_ss_rt_.setSize(behavior_switch_history_length_, &common_behavior::MasterServiceRequester::allocatePredicateList, *master_service_);
 
-    // retrieve behaviors list
-    for (int i = 0; i < behavior_names_.size(); ++i) {
-        auto b_ptr = common_behavior::BehaviorFactory::Instance()->Create( behavior_names_[i] );
-        if (b_ptr) {
-            behaviors_.push_back(b_ptr);
-        }
-        else {
-            Logger::log() << Logger::Error << "unknown behavior: " << behavior_names_[i] << Logger::endl;
-            return false;
-        }
-    }
+// TODO
+    // select initial behavior
+//    for (int i = 0; i < behaviors_.size(); ++i) {
+//        if (behaviors_[i]->getName() == initial_behavior_names_) {
+//            current_behavior_ = behaviors_[i];
+//            diag_ss_rt_.addBehaviorSwitch(i, RTT::os::TimeService::Instance()->getNSecs(), DiagBehaviorSwitch::INIT);
+//        }
+//    }
 
-    diag_ss_rt_.setSize(state_switch_history_length_, &common_behavior::MasterServiceRequester::allocatePredicateList, *master_service_);
+    diag_bs_sync_.data_sample(diag_ss_rt_);
+    diag_bs_sync_.Set(diag_ss_rt_);
 
-    // select initial state
-    for (int i = 0; i < states_.size(); ++i) {
-        if (states_[i]->getStateName() == initial_state_name_) {
-            current_state_ = states_[i];
-            diag_ss_rt_.addStateSwitch(i, RTT::os::TimeService::Instance()->getNSecs(), DiagStateSwitch::INIT);
-        }
-    }
-
-    diag_ss_sync_.data_sample(diag_ss_rt_);
-    diag_ss_sync_.Set(diag_ss_rt_);
-
-    if (!current_state_) {
-        Logger::log() << Logger::Error << "unknown initial state: " << initial_state_name_ << Logger::endl;
-        return false;
-    }
+//    if (!current_behavior_) {
+//        Logger::log() << Logger::Error << "unknown initial behavior: " << initial_behavior_names_ << Logger::endl;
+//        return false;
+//    }
 
     // get names of all components that are needed for all behaviors
     std::set<std::string > switchable_components;
@@ -411,7 +404,7 @@ bool MasterComponent::configureHook() {
 }
 
 bool MasterComponent::startHook() {
-    state_switch_ = true;
+    behavior_switch_ = true;
 
     master_service_->initBuffers(in_data_);
 
@@ -445,13 +438,13 @@ void MasterComponent::updateHook() {
     // get current behavior
     std::shared_ptr<common_behavior::BehaviorBase > current_behavior;
     for (int i = 0; i < behaviors_.size(); ++i) {
-        if (current_state_->getBehaviorName() == behaviors_[i]->getName()) {
+        if (current_behavior_->getName() == behaviors_[i]->getName()) {
             current_behavior = behaviors_[i];
             break;
         }
     }
 
-    master_service_->calculatePredicates(in_data_, scheme_peers_, current_state_->getStateName(), predicate_list_);
+    master_service_->calculatePredicates(in_data_, scheme_peers_, predicate_list_);
 
     //
     // check error condition
@@ -465,43 +458,43 @@ void MasterComponent::updateHook() {
     predicate_list_->IN_ERROR = pred_err;
 
     if (pred_err) {
-        int next_state_index = -1;
-        for (int i = 0; i < states_.size(); ++i) {
-            if ( states_[i]->checkInitialCondition(predicate_list_) ) {
-                if (next_state_index == -1) {
-                    next_state_index = i;
+        int next_behavior_index = -1;
+        for (int i = 0; i < behaviors_.size(); ++i) {
+            if ( behaviors_[i]->checkInitialCondition(predicate_list_) ) {
+                if (next_behavior_index == -1) {
+                    next_behavior_index = i;
                 }
                 else {
                     Logger::In in("MasterComponent::updateHook");
-                    Logger::log() << Logger::Error << "two or more states have the same initial condition (err): current_state="
-                        << current_state_->getStateName()
-                        << ", states: " << states_[i]->getStateName() << ", " << states_[next_state_index]->getStateName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_)
+                    Logger::log() << Logger::Error << "two or more behaviors have the same initial condition (err): current_behavior="
+                        << current_behavior_->getName()
+                        << ", behaviors: " << behaviors_[i]->getName() << ", " << behaviors_[next_behavior_index]->getName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_)
                         << Logger::endl;
-                    diag_ss_rt_.addStateSwitch(-1, now, DiagStateSwitch::ERROR, predicate_list_);
+                    diag_ss_rt_.addBehaviorSwitch(-1, now, DiagBehaviorSwitch::ERROR, predicate_list_);
                     error();
                     return;
                 }
             }
         }
-        if (next_state_index == -1) {
+        if (next_behavior_index == -1) {
             Logger::In in("MasterComponent::updateHook");
-            Logger::log() << Logger::Error << "cannot switch to new state (initial condition, err): current_state="
-                << current_state_->getStateName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_) << Logger::endl;
-            diag_ss_rt_.addStateSwitch(-1, now, DiagStateSwitch::ERROR, predicate_list_);
+            Logger::log() << Logger::Error << "cannot switch to new behavior (initial condition, err): current_behavior="
+                << current_behavior_->getName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_) << Logger::endl;
+            diag_ss_rt_.addBehaviorSwitch(-1, now, DiagBehaviorSwitch::ERROR, predicate_list_);
             error();
             return;
         }
         else {
-                Logger::log() << Logger::Info << "state_switch (error) from "
-                    << current_state_->getStateName()
-                    << " to " << states_[next_state_index]->getStateName()
+                Logger::log() << Logger::Info << "behavior_switch (error) from "
+                    << current_behavior_->getName()
+                    << " to " << behaviors_[next_behavior_index]->getName()
                     << Logger::endl;
 
-            current_state_ = states_[next_state_index];
-            diag_ss_rt_.addStateSwitch(next_state_index, now, DiagStateSwitch::ERROR, predicate_list_);
-            diag_ss_sync_.Set(diag_ss_rt_);
+            current_behavior_ = behaviors_[next_behavior_index];
+            diag_ss_rt_.addBehaviorSwitch(next_behavior_index, now, DiagBehaviorSwitch::ERROR, predicate_list_);
+            diag_bs_sync_.Set(diag_ss_rt_);
 
-            state_switch_ = true;
+            behavior_switch_ = true;
         }
     }
     else {
@@ -511,52 +504,52 @@ void MasterComponent::updateHook() {
         bool pred_stop = current_behavior->checkStopCondition(predicate_list_);
 
         if (pred_stop) {
-            int next_state_index = -1;
-            for (int i = 0; i < states_.size(); ++i) {
-                if ( states_[i]->checkInitialCondition(predicate_list_) ) {
-                    if (next_state_index == -1) {
-                        next_state_index = i;
+            int next_behavior_index = -1;
+            for (int i = 0; i < behaviors_.size(); ++i) {
+                if ( behaviors_[i]->checkInitialCondition(predicate_list_) ) {
+                    if (next_behavior_index == -1) {
+                        next_behavior_index = i;
                     }
                     else {
                         Logger::In in("MasterComponent::updateHook");
-                        Logger::log() << Logger::Error << "two or more states have the same initial condition (stop): current_state="
-                            << current_state_->getStateName()
-                            << ", states: " << states_[i]->getStateName() << ", " << states_[next_state_index]->getStateName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_)
+                        Logger::log() << Logger::Error << "two or more behaviors have the same initial condition (stop): current_behavior="
+                            << current_behavior_->getName()
+                            << ", behaviors: " << behaviors_[i]->getName() << ", " << behaviors_[next_behavior_index]->getName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_)
                             << Logger::endl;
-                        diag_ss_rt_.addStateSwitch(-1, now, DiagStateSwitch::STOP, predicate_list_);
+                        diag_ss_rt_.addBehaviorSwitch(-1, now, DiagBehaviorSwitch::STOP, predicate_list_);
                         error();
                         return;
                     }
                 }
             }
-            if (next_state_index == -1) {
+            if (next_behavior_index == -1) {
                 Logger::In in("MasterComponent::updateHook");
-                Logger::log() << Logger::Error << "cannot switch to new state (initial condition, stop): current_state="
-                    << current_state_->getStateName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_) << Logger::endl;
-                diag_ss_rt_.addStateSwitch(-1, now, DiagStateSwitch::STOP, predicate_list_);
+                Logger::log() << Logger::Error << "cannot switch to new behavior (initial condition, stop): current_behavior="
+                    << current_behavior_->getName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_) << Logger::endl;
+                diag_ss_rt_.addBehaviorSwitch(-1, now, DiagBehaviorSwitch::STOP, predicate_list_);
                 error();
                 return;
             }
             else {
-                Logger::log() << Logger::Info << "state_switch (stop) from "
-                    << current_state_->getStateName()
-                    << " to " << states_[next_state_index]->getStateName()
+                Logger::log() << Logger::Info << "behavior_switch (stop) from "
+                    << current_behavior_->getName()
+                    << " to " << behaviors_[next_behavior_index]->getName()
                     << Logger::endl;
 
-                current_state_ = states_[next_state_index];
-                diag_ss_rt_.addStateSwitch(next_state_index, now, DiagStateSwitch::STOP, predicate_list_);
-                diag_ss_sync_.Set(diag_ss_rt_);
+                current_behavior_ = behaviors_[next_behavior_index];
+                diag_ss_rt_.addBehaviorSwitch(next_behavior_index, now, DiagBehaviorSwitch::STOP, predicate_list_);
+                diag_bs_sync_.Set(diag_ss_rt_);
 
-                state_switch_ = true;
+                behavior_switch_ = true;
             }
         }
     }
 
     //
-    // if the state has changed, reorganize the graph
+    // if the behavior has changed, reorganize the graph
     //
-    if (state_switch_) {
-        const std::string& behavior_name = current_state_->getBehaviorName();
+    if (behavior_switch_) {
+        const std::string& behavior_name = current_behavior_->getName();
 
         for (int i = 0; i < behaviors_.size(); ++i) {
             if (behaviors_[i]->getName() == behavior_name) {
@@ -564,7 +557,7 @@ void MasterComponent::updateHook() {
                 break;
             }
         }
-        state_switch_ = false;
+        behavior_switch_ = false;
     }
 
     if (scheme_->getTaskState() != RTT::TaskContext::Running) {
