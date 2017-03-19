@@ -113,11 +113,24 @@ private:
 
 class OutputScopeBase {
 public:
-    virtual bool isCompatible(OutputScopeBase&) const = 0;
+    virtual bool isCompatible(const OutputScopeBase&) const = 0;
+    bool isCompatible(const boost::shared_ptr<const OutputScopeBase >& ptr) const {
+        return isCompatible(*ptr.get());
+    }
 
-    virtual void add(OutputScopeBase&) = 0;
+    virtual void add(const OutputScopeBase&) = 0;
+    void add(const boost::shared_ptr<const OutputScopeBase >& ptr) {
+        add(*ptr.get());
+    }
 
-    virtual void substract(OutputScopeBase&) = 0;
+    virtual void substract(const OutputScopeBase&) = 0;
+    void substract(const boost::shared_ptr<const OutputScopeBase >& ptr) {
+        substract(*ptr.get());
+    }
+
+    virtual int getMaxCount() const = 0;
+
+    virtual bool isComplete() const = 0;
 };
 
 typedef boost::shared_ptr<OutputScopeBase > OutputScopeBasePtr;
