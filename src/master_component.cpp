@@ -228,6 +228,7 @@ std::string MasterComponent::getDiag() {
         if (s.pred_) {
             err_str = master_service_->getPredicatesStr(s.pred_);
         }
+
         std::string behavior_name;
         if (s.id_ >= 0) {
             for (int j = 0; j < possible_behaviors_[s.id_].size(); ++j) {
@@ -244,6 +245,8 @@ std::string MasterComponent::getDiag() {
     }
 
     strs << "</h>";
+
+    strs << "<pr v=\"" << master_service_->getPredicatesStr(predicate_list_) << "\" />";
 
     strs << "<p>" << last_exec_period_ << "</p>";
     strs << "</mcd>";
@@ -272,9 +275,9 @@ bool MasterComponent::addBehavior(const std::shared_ptr<common_behavior::Behavio
 
 bool MasterComponent::removeBehavior(const std::shared_ptr<common_behavior::BehaviorBase >& ptr) {
     for (int i = 0; i < current_behaviors_.size(); ++i) {
-        if (current_behaviors_[i]->getName() == ptr->getName()) {
-            current_behaviors_[i] = NULL;
+        if (current_behaviors_[i] && current_behaviors_[i]->getName() == ptr->getName()) {
             output_scope_->substract(ptr->getOutputScope());
+            current_behaviors_[i] = std::shared_ptr<common_behavior::BehaviorBase >();
             return true;
         }
     }
@@ -450,13 +453,14 @@ bool MasterComponent::configureHook() {
     switchToConfiguration_ = RTT::OperationCaller<bool(int)>(
         switchToConfigurationOp, scheme_->engine());
 
+    Logger::log() << Logger::Info << "conman graph configurations:" << Logger::endl;
     // add graph configuration for each possible combination of behaviors
     for (int i = 0; i < possible_behaviors_.size(); ++i) {
         std::vector<std::string > vec_running;
         for (int j = 0; j < possible_behaviors_[i].size(); ++j) {
             const std::vector<std::string >& v = behaviors_[possible_behaviors_[i][j]]->getRunningComponents();
             for (int k = 0; k < v.size(); ++k) {
-                if (std::find(vec_running.begin(), vec_running.end(), v[k]) != vec_running.end()) {
+                if (std::find(vec_running.begin(), vec_running.end(), v[k]) == vec_running.end()) {
                     vec_running.push_back(v[k]);
                 }
             }
@@ -475,6 +479,17 @@ bool MasterComponent::configureHook() {
                 vec_stopped.push_back( *ic );
             }
         }
+
+        std::string str_running, str_stopped;
+        for (int j = 0; j < vec_stopped.size(); ++j) {
+            str_stopped += vec_stopped[j] + ", ";
+        }
+        for (int j = 0; j < vec_running.size(); ++j) {
+            str_running += vec_running[j] + ", ";
+        }
+
+        Logger::log() << Logger::Info << i << "  s:[" << str_stopped << "], r:[" << str_running << "]" << Logger::endl;
+
         addGraphConfiguration_(i, vec_stopped, vec_running);
     }
 
@@ -612,14 +627,6 @@ void MasterComponent::updateHook() {
         printCurrentBehaviors();
 
     }
-    // get current behavior
-//    std::shared_ptr<common_behavior::BehaviorBase > current_behavior;
-//    for (int i = 0; i < behaviors_.size(); ++i) {
-//        if (current_behavior_->getName() == behaviors_[i]->getName()) {
-//            current_behavior = behaviors_[i];
-//            break;
-//        }
-//    }
 
     master_service_->calculatePredicates(in_data_, scheme_peers_, predicate_list_);
 
@@ -824,9 +831,13 @@ void MasterComponent::updateHook() {
     //
 
     if (behavior_switch) {
-        std::string curr_beh;   // TODO: this string allocates - remove it after testing
+//        std::string curr_beh;   // TODO: this string allocates - remove it after testing
 
-        switchToConfiguration_(new_behavior_idx);
+        if (!switchToConfiguration_(new_behavior_idx)) {
+            Logger::log() << Logger::Error << "could not switch graph configuration" << Logger::endl;
+            error();
+            return;
+        }
 
 /*
         for (int i = 0; i < current_behaviors_.size(); ++i) {
