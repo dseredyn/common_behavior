@@ -161,10 +161,12 @@ private:
     bool isCurrentBehavior(const std::string& behavior_name) const;
     bool isCurrentBehavior(int behavior_idx) const;
     int currentBehaviorsCount() const;
+    bool isGraphOk() const;
 
     std::vector<std::shared_ptr<common_behavior::BehaviorBase > > behaviors_;
     std::vector<std::shared_ptr<common_behavior::BehaviorBase > > current_behaviors_;
     std::vector<std::vector<int> > possible_behaviors_;
+    int current_behavior_idx_;
 
     common_behavior::OutputScopeBasePtr output_scope_;
 
@@ -177,7 +179,8 @@ private:
     RTT::OperationCaller<bool(int)> switchToConfiguration_;
 
     std::vector<TaskContext* > scheme_peers_;
-    std::vector<std::vector<bool> > is_running_;
+    std::set<std::string > switchable_components_;
+    std::vector<std::set<std::string > > running_components_in_behavior_;
 
     bool first_step_;
 
@@ -403,17 +406,15 @@ bool MasterComponent::configureHook() {
 //    }
 
     // get names of all components that are needed for all behaviors
-    std::set<std::string > switchable_components;
-
     for (int i = 0; i < behaviors_.size(); ++i) {
         const std::vector<std::string >& comp_vec = behaviors_[i]->getRunningComponents();
         for (int j = 0; j < comp_vec.size(); ++j) {
-            switchable_components.insert( comp_vec[j] );
+            switchable_components_.insert( comp_vec[j] );
         }
     }
 
     std::string switchable_components_str;
-    for (std::set<std::string >::const_iterator it = switchable_components.begin(); it != switchable_components.end(); ++it) {
+    for (std::set<std::string >::const_iterator it = switchable_components_.begin(); it != switchable_components_.end(); ++it) {
         switchable_components_str = switchable_components_str + (switchable_components_str.empty()?"":", ") + (*it);
     }
     Logger::log() << Logger::Info << "switchable components: " << switchable_components_str << Logger::endl;
@@ -428,7 +429,7 @@ bool MasterComponent::configureHook() {
         hasBlockOp, scheme_->engine());
 
 
-    for (std::set<std::string >::const_iterator it = switchable_components.begin(); it != switchable_components.end(); ++it) {
+    for (std::set<std::string >::const_iterator it = switchable_components_.begin(); it != switchable_components_.end(); ++it) {
         if (!hasBlock_( *it )) {
             Logger::log() << Logger::Error << "could not find a component \'" << (*it) << "\' in the scheme blocks list" << Logger::endl;
             return false;
@@ -465,9 +466,10 @@ bool MasterComponent::configureHook() {
                 }
             }
         }
+        running_components_in_behavior_.push_back(std::set<std::string >(vec_running.begin(), vec_running.end()));
 
         std::vector<std::string > vec_stopped;
-        for (std::set<std::string >::const_iterator ic = switchable_components.begin(); ic != switchable_components.end(); ++ic) {
+        for (std::set<std::string >::const_iterator ic = switchable_components_.begin(); ic != switchable_components_.end(); ++ic) {
             bool is_running = false;
             for (int ir = 0; ir < vec_running.size(); ++ir) {
                 if ( (*ic) == vec_running[ir] ) {
@@ -498,7 +500,7 @@ bool MasterComponent::configureHook() {
     for (int i = 0; i < behaviors_.size(); ++i) {
         std::vector<std::string > vec_stopped;
         const std::vector<std::string >& vec_running = behaviors_[i]->getRunningComponents();
-        for (std::set<std::string >::const_iterator ic = switchable_components.begin(); ic != switchable_components.end(); ++ic) {
+        for (std::set<std::string >::const_iterator ic = switchable_components_.begin(); ic != switchable_components_.end(); ++ic) {
             bool is_running = false;
             for (int ir = 0; ir < vec_running.size(); ++ir) {
                 if ( (*ic) == vec_running[ir] ) {
@@ -538,9 +540,6 @@ void MasterComponent::printCurrentBehaviors() const {
 
 bool MasterComponent::startHook() {
     first_step_ = true;
-
-    master_service_->initBuffers(in_data_);
-
     return true;
 }
 
@@ -570,6 +569,42 @@ int MasterComponent::currentBehaviorsCount() const {
     return result;
 }
 
+bool MasterComponent::isGraphOk() const {
+
+    if (current_behavior_idx_ < 0 || current_behavior_idx_ >= running_components_in_behavior_.size()) {
+        return false;
+    }
+
+    for (int i = 0; i < scheme_peers_.size(); ++i) {
+        const std::string& name = scheme_peers_[i]->getName();
+        RTT::TaskContext::TaskState state = scheme_peers_[i]->getTaskState();
+
+        if (running_components_in_behavior_[current_behavior_idx_].find(name) != running_components_in_behavior_[current_behavior_idx_].end()) {
+            // switchable component that should be running in current behavior
+
+            if (state != RTT::TaskContext::Running) {
+                Logger::log() << Logger::Error << "switchable component \'" << name << "\' should be running" << Logger::endl;
+                return false;
+            }
+        }
+        else if (switchable_components_.find(name) != switchable_components_.end()) {
+            // switchable component that should be stopped in current behavior
+            if (state != RTT::TaskContext::Stopped) {
+                Logger::log() << Logger::Error << "switchable component \'" << name << "\' should be stopped" << Logger::endl;
+                return false;
+            }
+        }
+        else {
+            // non-switchable component - should be runing in all behaviors
+            if (state != RTT::TaskContext::Running) {
+                Logger::log() << Logger::Error << "non-switchable component \'" << name << "\' should be running" << Logger::endl;
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 void MasterComponent::updateHook() {
 
     // What time is it
@@ -594,6 +629,7 @@ void MasterComponent::updateHook() {
     bool behavior_switch = false;
     int new_behavior_idx = -1;
 
+    bool graphOk = true;
     if (first_step_) {
         first_step_ = false;
         behavior_switch = true;
@@ -625,17 +661,21 @@ void MasterComponent::updateHook() {
         Logger::log() << Logger::Info << "switched to init behavior: " << new_behavior_idx
             << Logger::endl;
         printCurrentBehaviors();
-
+    }
+    else {
+        // conman graph is initialized in first iteration
+        graphOk = isGraphOk();
     }
 
     master_service_->calculatePredicates(in_data_, scheme_peers_, predicate_list_);
+    predicate_list_->CURRENT_BEHAVIOR_OK = graphOk;
 
     bool err_cond = false;
     for (int i = 0; i < current_behaviors_.size(); ++i) {
         if (current_behaviors_[i] && current_behaviors_[i]->checkErrorCondition(predicate_list_)) {
             err_cond = true;
             if (!removeBehavior(current_behaviors_[i])) {
-                Logger::log() << Logger::Error << "could not remove current behavior \'" << current_behaviors_[i]->getName() << "\' (on error condition)" << Logger::endl;
+                Logger::log() << Logger::Error << "could not remove current behavior \'" << current_behaviors_[i]->getName() << "\' (on error condition #1)" << Logger::endl;
                 printCurrentBehaviors();
                 error();
                 return;
@@ -644,18 +684,34 @@ void MasterComponent::updateHook() {
     }
 
     bool stop_cond = false;
-    for (int i = 0; i < current_behaviors_.size(); ++i) {
-        if (current_behaviors_[i] && current_behaviors_[i]->checkStopCondition(predicate_list_)) {
-            stop_cond = true;
-            if (!removeBehavior(current_behaviors_[i])) {
-                Logger::log() << Logger::Error << "could not remove current behavior \'" << current_behaviors_[i]->getName() << "\' (on stop condition)" << Logger::endl;
-                printCurrentBehaviors();
-                error();
-                return;
+
+    if (err_cond) {
+        // remove all current sub-behaviors
+        for (int i = 0; i < current_behaviors_.size(); ++i) {
+            if (current_behaviors_[i]) {
+                if (!removeBehavior(current_behaviors_[i])) {
+                    Logger::log() << Logger::Error << "could not remove current behavior \'" << current_behaviors_[i]->getName() << "\' (on error condition #2)" << Logger::endl;
+                    printCurrentBehaviors();
+                    error();
+                    return;
+                }
             }
         }
     }
-
+    else {
+        // no error - check stop conditions
+        for (int i = 0; i < current_behaviors_.size(); ++i) {
+            if (current_behaviors_[i] && current_behaviors_[i]->checkStopCondition(predicate_list_)) {
+                stop_cond = true;
+                if (!removeBehavior(current_behaviors_[i])) {
+                    Logger::log() << Logger::Error << "could not remove current behavior \'" << current_behaviors_[i]->getName() << "\' (on stop condition)" << Logger::endl;
+                    printCurrentBehaviors();
+                    error();
+                    return;
+                }
+            }
+        }
+    }
     predicate_list_->IN_ERROR = err_cond;
 
     if (stop_cond || err_cond) {
@@ -838,6 +894,8 @@ void MasterComponent::updateHook() {
             error();
             return;
         }
+
+        current_behavior_idx_ = new_behavior_idx;
 
 /*
         for (int i = 0; i < current_behaviors_.size(); ++i) {

@@ -35,6 +35,7 @@ namespace common_behavior {
 class PredicateList {
 public:
     bool IN_ERROR;
+    bool CURRENT_BEHAVIOR_OK;
 
     virtual PredicateList& operator=(const PredicateList& arg) = 0;
 };

@@ -67,9 +67,6 @@ class MasterService: public RTT::Service {
 
     this->addOperation("allocateOutputScope", &MasterService::allocateOutputScope, this, RTT::ClientThread);
 
-    this->addOperation("getErrorReasonStr", &MasterService::getErrorReasonStr, this, RTT::ClientThread);
-    this->addOperation("getErrorReasonSample", &MasterService::getErrorReasonSample, this, RTT::ClientThread);
-
     this->addOperation("iterationEnd", &MasterService::iterationEnd, this, RTT::ClientThread);
   }
 
@@ -99,10 +96,6 @@ class MasterService: public RTT::Service {
   virtual std::string getPredicatesStr(const PredicateListConstPtr&) const = 0;
 
   virtual OutputScopeBasePtr allocateOutputScope() = 0;
-
-  // this method may not be RT-safe
-  virtual std::string getErrorReasonStr(AbstractConditionCauseConstPtr error_reason) const = 0;
-  virtual AbstractConditionCausePtr getErrorReasonSample() const = 0;
 
   virtual void iterationEnd() = 0;
 };

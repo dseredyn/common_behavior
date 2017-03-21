@@ -59,8 +59,6 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     , calculatePredicates("calculatePredicates")
     , getPredicatesStr("getPredicatesStr")
     , allocateOutputScope("allocateOutputScope")
-    , getErrorReasonStr("getErrorReasonStr")
-    , getErrorReasonSample("getErrorReasonSample")
     , iterationEnd("iterationEnd")
   {
     this->addOperationCaller(initBuffers);
@@ -84,9 +82,6 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     this->addOperationCaller(getPredicatesStr);
 
     this->addOperationCaller(allocateOutputScope);
-
-    this->addOperationCaller(getErrorReasonStr);
-    this->addOperationCaller(getErrorReasonSample);
 
     this->addOperationCaller(iterationEnd);
   }
@@ -115,10 +110,6 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<std::string(const PredicateListConstPtr&) > getPredicatesStr;
 
   RTT::OperationCaller<OutputScopeBasePtr() > allocateOutputScope;
-
-  // this method may not be RT-safe
-  RTT::OperationCaller<std::string(AbstractConditionCauseConstPtr)> getErrorReasonStr;
-  RTT::OperationCaller<AbstractConditionCausePtr()> getErrorReasonSample;
 
   RTT::OperationCaller<void()> iterationEnd;
 };
