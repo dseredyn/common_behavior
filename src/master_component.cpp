@@ -405,11 +405,22 @@ bool MasterComponent::configureHook() {
 //        return false;
 //    }
 
+    RTT::OperationInterfacePart *hasBlockOp = scheme_->getOperation("hasBlock");
+    if (hasBlockOp == NULL) {
+        Logger::log() << Logger::Error << "the peer " << scheme_->getName() << " has no matching operation hasBlock" << Logger::endl;
+        return false;
+    }
+
+    hasBlock_ =  RTT::OperationCaller<bool(const std::string &)>(
+        hasBlockOp, scheme_->engine());
+
     // get names of all components that are needed for all behaviors
     for (int i = 0; i < behaviors_.size(); ++i) {
         const std::vector<std::string >& comp_vec = behaviors_[i]->getRunningComponents();
         for (int j = 0; j < comp_vec.size(); ++j) {
-            switchable_components_.insert( comp_vec[j] );
+            if (hasBlock_( comp_vec[j] )) {
+                switchable_components_.insert( comp_vec[j] );
+            }
         }
     }
 
@@ -419,14 +430,6 @@ bool MasterComponent::configureHook() {
     }
     Logger::log() << Logger::Info << "switchable components: " << switchable_components_str << Logger::endl;
 
-    RTT::OperationInterfacePart *hasBlockOp = scheme_->getOperation("hasBlock");
-    if (hasBlockOp == NULL) {
-        Logger::log() << Logger::Error << "the peer " << scheme_->getName() << " has no matching operation hasBlock" << Logger::endl;
-        return false;
-    }
-
-    hasBlock_ =  RTT::OperationCaller<bool(const std::string &)>(
-        hasBlockOp, scheme_->engine());
 
 
     for (std::set<std::string >::const_iterator it = switchable_components_.begin(); it != switchable_components_.end(); ++it) {
@@ -462,7 +465,9 @@ bool MasterComponent::configureHook() {
             const std::vector<std::string >& v = behaviors_[possible_behaviors_[i][j]]->getRunningComponents();
             for (int k = 0; k < v.size(); ++k) {
                 if (std::find(vec_running.begin(), vec_running.end(), v[k]) == vec_running.end()) {
-                    vec_running.push_back(v[k]);
+                    if (hasBlock_( v[k] )) {
+                        vec_running.push_back(v[k]);
+                    }
                 }
             }
         }
