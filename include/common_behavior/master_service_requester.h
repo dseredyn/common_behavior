@@ -43,9 +43,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
  public:
   explicit MasterServiceRequester(RTT::TaskContext *owner)
     : RTT::ServiceRequester("master", owner)
-    , initBuffers("initBuffers")
-    , readIpcPorts("readIpcPorts")
-    , readInternalPorts("readInternalPorts")
+    , initBuffersData("initBuffersData")
+    , readBuffers("readBuffers")
     , writePorts("writePorts")
     , getDataSample("getDataSample")
     , getLowerInputBuffers("getLowerInputBuffers")
@@ -61,9 +60,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     , allocateOutputScope("allocateOutputScope")
     , iterationEnd("iterationEnd")
   {
-    this->addOperationCaller(initBuffers);
-    this->addOperationCaller(readIpcPorts);
-    this->addOperationCaller(readInternalPorts);
+    this->addOperationCaller(initBuffersData);
+    this->addOperationCaller(readBuffers);
     this->addOperationCaller(writePorts);
     this->addOperationCaller(getDataSample);
 
@@ -87,9 +85,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   }
 
   // OROCOS ports operations
-  RTT::OperationCaller<void (InputDataPtr&)> initBuffers;
-  RTT::OperationCaller<void(InputDataPtr&)> readIpcPorts;
-  RTT::OperationCaller<void(InputDataPtr&)> readInternalPorts;
+  RTT::OperationCaller<void (InputDataPtr&)> initBuffersData;
+  RTT::OperationCaller<void(InputDataPtr&)> readBuffers;
   RTT::OperationCaller<void (InputDataPtr&)> writePorts;
   RTT::OperationCaller<InputDataPtr()> getDataSample;
 

@@ -625,9 +625,8 @@ void MasterComponent::updateHook() {
     last_exec_period_ = time - last_exec_time_;
     last_exec_time_ = time;
 
-    master_service_->initBuffers(in_data_);
-    master_service_->readIpcPorts(in_data_);
-    master_service_->readInternalPorts(in_data_);
+    master_service_->initBuffersData(in_data_);
+    master_service_->readBuffers(in_data_);
 
     master_service_->writePorts(in_data_);
 
@@ -962,7 +961,7 @@ void MasterComponent::updateHook() {
     master_service_->iterationEnd();
 /*
 // TODO: determine if this is needed here
-    master_service_->initBuffers(in_data_);
+    master_service_->initBuffersData(in_data_);
     if (!master_service_->readStatusPorts(in_data_)) {
         error();
     }

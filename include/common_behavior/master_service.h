@@ -45,9 +45,8 @@ class MasterService: public RTT::Service {
  public:
   explicit MasterService(RTT::TaskContext* owner) :
       RTT::Service("master", owner) {
-    this->addOperation("initBuffers", &MasterService::initBuffers, this, RTT::ClientThread);
-    this->addOperation("readIpcPorts", &MasterService::readIpcPorts, this, RTT::ClientThread);
-    this->addOperation("readInternalPorts", &MasterService::readInternalPorts, this, RTT::ClientThread);
+    this->addOperation("initBuffersData", &MasterService::initBuffersData, this, RTT::ClientThread);
+    this->addOperation("readBuffers", &MasterService::readBuffers, this, RTT::ClientThread);
     this->addOperation("writePorts", &MasterService::writePorts, this, RTT::ClientThread);
     this->addOperation("getDataSample", &MasterService::getDataSample, this, RTT::ClientThread);
 
@@ -71,9 +70,8 @@ class MasterService: public RTT::Service {
   }
 
   // OROCOS ports operations
-  virtual void initBuffers(InputDataPtr& in_data) const = 0;
-  virtual void readIpcPorts(InputDataPtr& in_data) = 0;
-  virtual void readInternalPorts(InputDataPtr& in_data) = 0;
+  virtual void initBuffersData(InputDataPtr& in_data) const = 0;
+  virtual void readBuffers(InputDataPtr& in_data) = 0;
   virtual void writePorts(InputDataPtr& in_data) = 0;
   virtual InputDataPtr getDataSample() const = 0;
 
