@@ -39,42 +39,11 @@
 
 namespace common_behavior {
 
-class OutputScopeBase {
-public:
-    virtual bool isCompatible(const OutputScopeBase&) const = 0;
-    bool isCompatible(const boost::shared_ptr<const OutputScopeBase >& ptr) const {
-        return isCompatible(*ptr.get());
-    }
-
-    virtual void add(const OutputScopeBase&) = 0;
-    void add(const boost::shared_ptr<const OutputScopeBase >& ptr) {
-        add(*ptr.get());
-    }
-
-    virtual void substract(const OutputScopeBase&) = 0;
-    void substract(const boost::shared_ptr<const OutputScopeBase >& ptr) {
-        substract(*ptr.get());
-    }
-
-    virtual int getMaxCount() const = 0;
-
-    virtual bool isComplete() const = 0;
-};
-
-typedef boost::shared_ptr<OutputScopeBase > OutputScopeBasePtr;
-typedef boost::shared_ptr<const OutputScopeBase > OutputScopeBaseConstPtr;
-
 class BehaviorBase {
 public:
 
-    virtual bool checkInitialCondition(const PredicateListConstPtr& pred_list) const = 0;
     virtual bool checkErrorCondition(const PredicateListConstPtr& pred_list) const = 0;
     virtual bool checkStopCondition(const PredicateListConstPtr& pred_list) const = 0;
-    virtual OutputScopeBaseConstPtr getOutputScope() const = 0;
-
-    bool isInitial() const {
-        return is_initial_;
-    }
 
     const std::string& getName() const {
         return name_;
@@ -96,10 +65,7 @@ protected:
     explicit BehaviorBase(const std::string& name, const std::string& short_name)
         : name_(name)
         , short_name_(short_name)
-        , is_initial_(false)
     { }
-
-    bool is_initial_;
 
 private:
     std::vector<std::string > running_;

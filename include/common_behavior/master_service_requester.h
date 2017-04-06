@@ -52,12 +52,11 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     , getLowerOutputBuffers("getLowerOutputBuffers")
     , getUpperOutputBuffers("getUpperOutputBuffers")
     , getBehaviors("getBehaviors")
-    , getInitialBehaviors("getInitialBehaviors")
-    , getLatchedConnections("getLatchedConnections")
+    , getStates("getStates")
+    , getInitialState("getInitialState")
     , allocatePredicateList("allocatePredicateList")
     , calculatePredicates("calculatePredicates")
     , getPredicatesStr("getPredicatesStr")
-    , allocateOutputScope("allocateOutputScope")
     , iterationEnd("iterationEnd")
   {
     this->addOperationCaller(initBuffersData);
@@ -71,15 +70,12 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     this->addOperationCaller(getUpperOutputBuffers);
 
     this->addOperationCaller(getBehaviors);
-    this->addOperationCaller(getInitialBehaviors);
-
-    this->addOperationCaller(getLatchedConnections);
+    this->addOperationCaller(getStates);
+    this->addOperationCaller(getInitialState);
 
     this->addOperationCaller(allocatePredicateList);
     this->addOperationCaller(calculatePredicates);
     this->addOperationCaller(getPredicatesStr);
-
-    this->addOperationCaller(allocateOutputScope);
 
     this->addOperationCaller(iterationEnd);
   }
@@ -98,15 +94,12 @@ class MasterServiceRequester : public RTT::ServiceRequester {
 
   // FSM parameters
   RTT::OperationCaller<std::vector<std::string >()> getBehaviors;
-  RTT::OperationCaller<std::vector<std::string >()> getInitialBehaviors;
-
-  RTT::OperationCaller<std::vector<std::pair<std::string, std::string > >() > getLatchedConnections;
+  RTT::OperationCaller<std::vector<std::string >()> getStates;
+  RTT::OperationCaller<std::string()> getInitialState;
 
   RTT::OperationCaller<PredicateListPtr() > allocatePredicateList;
   RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, PredicateListPtr&) > calculatePredicates;
   RTT::OperationCaller<std::string(const PredicateListConstPtr&) > getPredicatesStr;
-
-  RTT::OperationCaller<OutputScopeBasePtr() > allocateOutputScope;
 
   RTT::OperationCaller<void()> iterationEnd;
 };

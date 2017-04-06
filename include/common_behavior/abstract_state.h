@@ -41,7 +41,7 @@ namespace common_behavior {
 class StateBase {
 public:
 
-    virtual bool checkInitialCondition(const PredicateListConstPtr& pred_list) const = 0;
+    virtual const std::string& getNextState(const PredicateListConstPtr& pred_list) const = 0;
 
     const std::string& getStateName() const {
         return state_name_;
@@ -51,22 +51,21 @@ public:
         return short_state_name_;
     }
 
-    const std::string& getBehaviorName() const {
-        return behavior_name_;
+    const std::vector<std::string>& getBehaviorNames() const {
+        return behavior_names_;
     }
 
 protected:
-    StateBase(const std::string& state_name, const std::string& short_state_name, const std::string& behavior_name)
+    StateBase(const std::string& state_name, const std::string& short_state_name, const std::vector<std::string >& behavior_names)
         : state_name_(state_name)
         , short_state_name_(short_state_name)
-        , behavior_name_(behavior_name)
+        , behavior_names_(behavior_names)
     { }
 
 private:
-    std::vector<std::string > running_;
     std::string state_name_;
     std::string short_state_name_;
-    std::string behavior_name_;
+    std::vector<std::string > behavior_names_;
 };
 
 class StateFactory

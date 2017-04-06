@@ -40,11 +40,15 @@
 #include "common_behavior/input_data.h"
 #include "common_behavior/master_service_requester.h"
 #include "common_behavior/master_service.h"
+#include "common_behavior/abstract_state.h"
 
 using namespace RTT;
 
 typedef std::shared_ptr<common_behavior::BehaviorBase > BehaviorBasePtr;
 typedef std::shared_ptr<const common_behavior::BehaviorBase > BehaviorBaseConstPtr;
+
+typedef std::shared_ptr<common_behavior::StateBase > StateBasePtr;
+typedef std::shared_ptr<const common_behavior::StateBase > StateBaseConstPtr;
 
 class DiagBehaviorSwitch {
 public:
@@ -121,18 +125,18 @@ private:
     std::vector<DiagBehaviorSwitch> h_;
     int idx_;
 };
-
-bool componentsInConflict(const std::string& c1, const std::string& c2, const std::set<std::pair<std::string, std::string > >& conflicting_components) const {
+/*
+bool componentsInConflict(const std::string& c1, const std::string& c2, const std::set<std::pair<std::string, std::string > >& conflicting_components) {
     std::pair<std::string, std::string > p1(c1, c2);
     std::pair<std::string, std::string > p2(c2, c1);
-    if (conflicting_components_.find(p1) == conflicting_components.end() &&
-        conflicting_components_.find(p2) == conflicting_components.end()) {
+    if (conflicting_components.find(p1) == conflicting_components.end() &&
+        conflicting_components.find(p2) == conflicting_components.end()) {
         return false;
     }
     return true;
 }
 
-bool behaviorsInConflict(const BehaviorBaseConstPtr &b1, const BehaviorBaseConstPtr &b2, const std::set<std::pair<std::string, std::string > >& conflicting_components) const {
+bool behaviorsInConflict(const BehaviorBaseConstPtr &b1, const BehaviorBaseConstPtr &b2, const std::set<std::pair<std::string, std::string > >& conflicting_components) {
     const std::vector<std::string >& b1_comp_vec = b1->getRunningComponents();
     const std::vector<std::string >& b2_comp_vec = b2->getRunningComponents();
     for (int i = 0; i < b1_comp_vec.size(); ++i) {
@@ -144,7 +148,8 @@ bool behaviorsInConflict(const BehaviorBaseConstPtr &b1, const BehaviorBaseConst
     }
     return false;
 }
-
+*/
+/*
 void recursiveAddBehavior(const std::vector<BehaviorBasePtr >& behaviors, int start_idx,
                             std::vector<std::vector<int> >& out, std::vector<int > bv = std::vector<int >()) {
 //    if (os->isComplete()) {
@@ -170,7 +175,7 @@ void recursiveAddBehavior(const std::vector<BehaviorBasePtr >& behaviors, int st
         }
     }
 }
-
+*/
 class MasterComponent: public RTT::TaskContext {
 public:
     explicit MasterComponent(const std::string &name);
@@ -188,6 +193,8 @@ public:
     bool addConmanScheme(RTT::TaskContext* scheme);
 
 private:
+    BehaviorBasePtr getBehavior(const std::string& name) const;
+    StateBasePtr getState(const std::string& name) const;
     bool addBehavior(const BehaviorBasePtr& ptr);
     bool removeBehavior(const BehaviorBasePtr& ptr);
     void calculateConflictingComponents();
@@ -197,12 +204,12 @@ private:
     int currentBehaviorsCount() const;
     bool isGraphOk() const;
 
-    std::vector<BehaviorBasePtr > behaviors_;
-    std::vector<BehaviorBasePtr > current_behaviors_;
-    std::vector<std::vector<int> > possible_behaviors_;
-    int current_behavior_idx_;
+    std::vector<StateBasePtr > states_;
+    StateBasePtr current_state_;
+    std::map<std::string, std::vector<BehaviorBasePtr > > state_behaviors_;
+    std::map<std::string, int > state_graphs_;
 
-    common_behavior::OutputScopeBasePtr output_scope_;
+    std::vector<BehaviorBasePtr > behaviors_;
 
     // pointer to conman scheme TaskContext
     TaskContext *scheme_;
@@ -270,10 +277,7 @@ std::string MasterComponent::getDiag() {
 
         std::string behavior_name;
         if (s.id_ >= 0) {
-            for (int j = 0; j < possible_behaviors_[s.id_].size(); ++j) {
-                behavior_name += behaviors_[possible_behaviors_[s.id_][j]]->getShortName() + ", ";
-            }
-//            behavior_name = behaviors_[s.id_]->getShortName();
+            behavior_name = states_[s.id_]->getShortStateName();
         }
         else {
             behavior_name = "INV_BEH";
@@ -296,31 +300,6 @@ std::string MasterComponent::getDiag() {
 bool MasterComponent::addConmanScheme(RTT::TaskContext* scheme) {
     scheme_ = scheme;
     return scheme_->setActivity( new RTT::extras::SlaveActivity(this->getActivity(), scheme_->engine()));
-}
-
-bool MasterComponent::addBehavior(const BehaviorBasePtr& ptr) {
-    if (!output_scope_->isCompatible(ptr->getOutputScope())) {
-        return false;
-    }
-    output_scope_->add(ptr->getOutputScope());
-    for (int i = 0; i < current_behaviors_.size(); ++i) {
-        if (!current_behaviors_[i]) {
-            current_behaviors_[i] = ptr;
-            return true;
-        }
-    }
-    return false;
-}
-
-bool MasterComponent::removeBehavior(const BehaviorBasePtr& ptr) {
-    for (int i = 0; i < current_behaviors_.size(); ++i) {
-        if (current_behaviors_[i] && current_behaviors_[i]->getName() == ptr->getName()) {
-            output_scope_->substract(ptr->getOutputScope());
-            current_behaviors_[i] = BehaviorBasePtr();
-            return true;
-        }
-    }
-    return false;
 }
 
 void MasterComponent::calculateConflictingComponents() {
@@ -372,6 +351,24 @@ void MasterComponent::calculateConflictingComponents() {
     }
 }
 
+BehaviorBasePtr MasterComponent::getBehavior(const std::string& name) const {
+    for (int i = 0; i < behaviors_.size(); ++i) {
+        if (behaviors_[i]->getName() == name) {
+            return behaviors_[i];
+        }
+    }
+    return BehaviorBasePtr();
+}
+
+StateBasePtr MasterComponent::getState(const std::string& name) const {
+    for (int i = 0; i < states_.size(); ++i) {
+        if (states_[i]->getStateName() == name) {
+            return states_[i];
+        }
+    }
+    return StateBasePtr();
+}
+
 bool MasterComponent::configureHook() {
     Logger::In in("MasterComponent::configureHook");
 
@@ -387,15 +384,28 @@ bool MasterComponent::configureHook() {
         return false;
     }
 
-    output_scope_ = master_service_->allocateOutputScope();
-    if (!output_scope_) {
-        Logger::log() << Logger::Error << "could not allocate output scope" << Logger::endl;
-        return false;
+    //
+    // retrieve states list
+    //
+    std::vector<std::string > state_names_ = master_service_->getStates();
+
+    Logger::log() << Logger::Info << "Used states:" << Logger::endl;
+    for (int i = 0; i < state_names_.size(); ++i) {
+        auto s_ptr = common_behavior::StateFactory::Instance()->Create( state_names_[i] );
+        if (s_ptr) {
+            Logger::log() << Logger::Info << "    " << state_names_[i] << ", short name: " << s_ptr->getShortStateName() << Logger::endl;
+            states_.push_back(s_ptr);
+        }
+        else {
+            Logger::log() << Logger::Error << "unknown state: " << state_names_[i] << Logger::endl;
+            return false;
+        }
     }
 
+    //
+    // retrieve behaviors list
+    //
     std::vector<std::string > behavior_names_ = master_service_->getBehaviors();
-
-//    std::vector<std::string > initial_behavior_names_ = master_service_->getInitialBehaviors();
 
     Logger::log() << Logger::Info << "Known behaviors: " << Logger::endl;
     for (auto it = common_behavior::BehaviorFactory::Instance()->getBehaviors().begin();
@@ -404,17 +414,11 @@ bool MasterComponent::configureHook() {
         Logger::log() << Logger::Info << "    " << it->first << Logger::endl;
     }
 
-//    Logger::log() << Logger::Info << "Initial behaviors: " << Logger::endl;
-//    for (int i = 0; i < initial_behavior_names_.size(); ++i) {
-//        Logger::log() << Logger::Info << initial_behavior_names_[i] << Logger::endl;
-//    }
-
-    // retrieve behaviors list
     Logger::log() << Logger::Info << "Used behaviors:" << Logger::endl;
     for (int i = 0; i < behavior_names_.size(); ++i) {
         auto b_ptr = common_behavior::BehaviorFactory::Instance()->Create( behavior_names_[i] );
         if (b_ptr) {
-            Logger::log() << Logger::Info << "    " << behavior_names_[i] << ", short name: " << b_ptr->getShortName() << ", initial: " << (b_ptr->isInitial()?"true":"false") << Logger::endl;
+            Logger::log() << Logger::Info << "    " << behavior_names_[i] << ", short name: " << b_ptr->getShortName() << Logger::endl;
             behaviors_.push_back(b_ptr);
         }
         else {
@@ -422,35 +426,41 @@ bool MasterComponent::configureHook() {
             return false;
         }
     }
-/*
-    // retrieve behavior names
-    for (int i = 0; i < behaviors_.size(); ++i) {
-        const std::string& behavior_name = behaviors_[i]->getName();
-        bool add = true;
-        for (int j = 0; j < behavior_names_.size(); ++j) {
-            if (behavior_names_[j] == behavior_name) {
-                add = false;
-                break;
-            }
+
+    Logger::log() << Logger::Info << "initial state: " << master_service_->getInitialState() << Logger::endl;
+
+    // create map of behaviors used in each state
+    for (int i = 0; i < states_.size(); ++i) {
+        if (states_[i]->getStateName() == master_service_->getInitialState()) {
+            current_state_ = states_[i];
         }
-        if (add) {
-            behavior_names_.push_back(behavior_name);
+        const std::vector<std::string>& behavior_names = states_[i]->getBehaviorNames();
+        std::vector<BehaviorBasePtr > state_behaviors;
+        for (int j = 0; j < behavior_names.size(); ++j) {
+            state_behaviors.push_back( getBehavior(behavior_names[j]) );
         }
+
+        state_behaviors_[states_[i]->getStateName()] = state_behaviors;
     }
-*/
+
+    if (!current_state_) {
+        Logger::log() << Logger::Error << "could not select initial state: " << master_service_->getInitialState() << Logger::endl;
+        return false;
+    }
 
     // retrieve the vector of peers of conman scheme
     TaskContext::PeerList scheme_peers_names = scheme_->getPeerList();
     for (int pi = 0; pi < scheme_peers_names.size(); ++pi) {
         scheme_peers_.push_back( scheme_->getPeer(scheme_peers_names[pi]) );
     }
-
+/*
     // prepare list of conflicting components
     calculateConflictingComponents();
 
     // calculate list of all possible complete behaviors
     common_behavior::OutputScopeBasePtr os = master_service_->allocateOutputScope();
-    recursiveAddBehavior(behaviors_, 0, os, possible_behaviors_);
+//TODO: uncomment
+//    recursiveAddBehavior(behaviors_, 0, os, possible_behaviors_);
     Logger::log() << Logger::Info << "possible complete behaviors: " << Logger::endl;
     for (int i = 0; i < possible_behaviors_.size(); ++i) {
         std::string str;
@@ -461,43 +471,11 @@ bool MasterComponent::configureHook() {
         }
         Logger::log() << Logger::Info << "    " << str << Logger::endl;
     }
-
+*/
     diag_ss_rt_.setSize(behavior_switch_history_length_, &common_behavior::MasterServiceRequester::allocatePredicateList, *master_service_);
-
-    current_behaviors_.resize(output_scope_->getMaxCount());
-
-    for (int i = 0; i < behaviors_.size(); ++i) {
-        if (behaviors_[i]->isInitial()) {
-            if (!output_scope_->isCompatible(behaviors_[i]->getOutputScope())) {
-                Logger::log() << Logger::Error << "initial behavior \'" << behaviors_[i]->getName() << "\' has not compatible output scope with other initial behaviors" << Logger::endl;
-                return false;
-            }
-            addBehavior(behaviors_[i]);
-        }
-    }
-
-    if (!output_scope_->isComplete()) {
-        Logger::log() << Logger::Error << "output scope is incomplete" << Logger::endl;
-        printCurrentBehaviors();
-        return false;
-    }
-
-// TODO
-    // select initial behavior
-//    for (int i = 0; i < behaviors_.size(); ++i) {
-//        if (behaviors_[i]->getName() == initial_behavior_names_) {
-//            current_behavior_ = behaviors_[i];
-//            diag_ss_rt_.addBehaviorSwitch(i, RTT::os::TimeService::Instance()->getNSecs(), DiagBehaviorSwitch::INIT);
-//        }
-//    }
 
     diag_bs_sync_.data_sample(diag_ss_rt_);
     diag_bs_sync_.Set(diag_ss_rt_);
-
-//    if (!current_behavior_) {
-//        Logger::log() << Logger::Error << "unknown initial behavior: " << initial_behavior_names_ << Logger::endl;
-//        return false;
-//    }
 
     RTT::OperationInterfacePart *hasBlockOp = scheme_->getOperation("hasBlock");
     if (hasBlockOp == NULL) {
@@ -552,11 +530,11 @@ bool MasterComponent::configureHook() {
         switchToConfigurationOp, scheme_->engine());
 
     Logger::log() << Logger::Info << "conman graph configurations:" << Logger::endl;
-    // add graph configuration for each possible combination of behaviors
-    for (int i = 0; i < possible_behaviors_.size(); ++i) {
+    for (int i = 0; i < states_.size(); ++i) {
+        const std::vector<BehaviorBasePtr >& state_behaviors = state_behaviors_[states_[i]->getStateName()];
         std::vector<std::string > vec_running;
-        for (int j = 0; j < possible_behaviors_[i].size(); ++j) {
-            const std::vector<std::string >& v = behaviors_[possible_behaviors_[i][j]]->getRunningComponents();
+        for (int j = 0; j < state_behaviors.size(); ++j) {
+            const std::vector<std::string >& v = state_behaviors[j]->getRunningComponents();
             for (int k = 0; k < v.size(); ++k) {
                 if (std::find(vec_running.begin(), vec_running.end(), v[k]) == vec_running.end()) {
                     if (hasBlock_( v[k] )) {
@@ -592,28 +570,8 @@ bool MasterComponent::configureHook() {
         Logger::log() << Logger::Info << i << "  s:[" << str_stopped << "], r:[" << str_running << "]" << Logger::endl;
 
         addGraphConfiguration_(i, vec_stopped, vec_running);
+        state_graphs_[states_[i]->getStateName()] = i;
     }
-
-/*
-    // add graph configuration for each behavior
-    for (int i = 0; i < behaviors_.size(); ++i) {
-        std::vector<std::string > vec_stopped;
-        const std::vector<std::string >& vec_running = behaviors_[i]->getRunningComponents();
-        for (std::set<std::string >::const_iterator ic = switchable_components_.begin(); ic != switchable_components_.end(); ++ic) {
-            bool is_running = false;
-            for (int ir = 0; ir < vec_running.size(); ++ir) {
-                if ( (*ic) == vec_running[ir] ) {
-                    is_running = true;
-                    break;
-                }
-            }
-            if (!is_running) {
-                vec_stopped.push_back( *ic );
-            }
-        }
-        addGraphConfiguration_(i, vec_stopped, vec_running);
-    }
-*/
 
     in_data_ = master_service_->getDataSample();
     if (!in_data_) {
@@ -624,14 +582,6 @@ bool MasterComponent::configureHook() {
     return true;
 }
 
-void MasterComponent::printCurrentBehaviors() const {
-    for (int i = 0; i < current_behaviors_.size(); ++i) {
-        if (current_behaviors_[i]) {
-            Logger::log() << Logger::Info << "current behavior: \'" << current_behaviors_[i]->getName() << Logger::endl;
-        }
-    }    
-}
-
 bool MasterComponent::startHook() {
     first_step_ = true;
     return true;
@@ -640,40 +590,15 @@ bool MasterComponent::startHook() {
 void MasterComponent::stopHook() {
 }
 
-bool MasterComponent::isCurrentBehavior(const std::string& behavior_name) const {
-    for (int i = 0; i < current_behaviors_.size(); ++i) {
-        if (current_behaviors_[i] && current_behaviors_[i]->getName() == behavior_name) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool MasterComponent::isCurrentBehavior(int behavior_idx) const {
-    return isCurrentBehavior( behaviors_[behavior_idx]->getName() );
-}
-
-int MasterComponent::currentBehaviorsCount() const {
-    int result = 0;
-    for (int i = 0; i < current_behaviors_.size(); ++i) {
-        if (current_behaviors_[i]) {
-            ++result;
-        }
-    }
-    return result;
-}
-
 bool MasterComponent::isGraphOk() const {
 
-    if (current_behavior_idx_ < 0 || current_behavior_idx_ >= running_components_in_behavior_.size()) {
-        return false;
-    }
+    int current_graph_id = state_graphs_.find(current_state_->getStateName())->second;
 
     for (int i = 0; i < scheme_peers_.size(); ++i) {
         const std::string& name = scheme_peers_[i]->getName();
         RTT::TaskContext::TaskState state = scheme_peers_[i]->getTaskState();
 
-        if (running_components_in_behavior_[current_behavior_idx_].find(name) != running_components_in_behavior_[current_behavior_idx_].end()) {
+        if (running_components_in_behavior_[current_graph_id].find(name) != running_components_in_behavior_[current_graph_id].end()) {
             // switchable component that should be running in current behavior
 
             if (state != RTT::TaskContext::Running) {
@@ -720,40 +645,14 @@ void MasterComponent::updateHook() {
     master_service_->writePorts(in_data_);
 
     bool behavior_switch = false;
-    int new_behavior_idx = -1;
 
     bool graphOk = true;
     if (first_step_) {
         first_step_ = false;
         behavior_switch = true;
 
-        int current_behaviors_count = currentBehaviorsCount();
-        for (int i = 0; i < possible_behaviors_.size(); ++i) {
-            int found_count = 0;
-            for (int j = 0; j < possible_behaviors_[i].size(); ++j) {
-                if (isCurrentBehavior(possible_behaviors_[i][j])) {
-                    ++found_count;
-                }
-            }
-            if (found_count == current_behaviors_count) {
-                if (new_behavior_idx == -1) {
-                    new_behavior_idx = i;
-                    diag_ss_rt_.addBehaviorSwitch(new_behavior_idx, now, DiagBehaviorSwitch::INIT);
-                    diag_bs_sync_.Set(diag_ss_rt_);
-                }
-                else {
-                    Logger::log() << Logger::Error << "initial behavior: two or more behaviors have the same initial condition"
-                        << Logger::endl;
-                    printCurrentBehaviors();
-                    error();
-                    return;
-                }
-            }
-        }
-    
-        Logger::log() << Logger::Info << "switched to init behavior: " << new_behavior_idx
-            << Logger::endl;
-        printCurrentBehaviors();
+        diag_ss_rt_.addBehaviorSwitch(state_graphs_[current_state_->getStateName()], now, DiagBehaviorSwitch::INIT);
+        diag_bs_sync_.Set(diag_ss_rt_);
     }
     else {
         // conman graph is initialized in first iteration
@@ -763,282 +662,60 @@ void MasterComponent::updateHook() {
     master_service_->calculatePredicates(in_data_, scheme_peers_, predicate_list_);
     predicate_list_->CURRENT_BEHAVIOR_OK = graphOk;
 
+//    Logger::log() << Logger::Info << "current state: " << current_state_->getStateName()
+//        << Logger::endl;
+
+    const std::vector<BehaviorBasePtr >& current_behaviors = state_behaviors_[current_state_->getStateName()];
     bool err_cond = false;
-    for (int i = 0; i < current_behaviors_.size(); ++i) {
-        if (current_behaviors_[i] && current_behaviors_[i]->checkErrorCondition(predicate_list_)) {
+    for (int i = 0; i < current_behaviors.size(); ++i) {
+        if (current_behaviors[i]->checkErrorCondition(predicate_list_)) {
             err_cond = true;
-            if (!removeBehavior(current_behaviors_[i])) {
-                Logger::log() << Logger::Error << "could not remove current behavior \'" << current_behaviors_[i]->getName() << "\' (on error condition #1)" << Logger::endl;
-                printCurrentBehaviors();
-                error();
-                return;
-            }
+            break;
         }
     }
 
     bool stop_cond = false;
 
-    if (err_cond) {
-        // remove all current sub-behaviors
-        for (int i = 0; i < current_behaviors_.size(); ++i) {
-            if (current_behaviors_[i]) {
-                if (!removeBehavior(current_behaviors_[i])) {
-                    Logger::log() << Logger::Error << "could not remove current behavior \'" << current_behaviors_[i]->getName() << "\' (on error condition #2)" << Logger::endl;
-                    printCurrentBehaviors();
-                    error();
-                    return;
-                }
-            }
-        }
-    }
-    else {
-        // no error - check stop conditions
-        for (int i = 0; i < current_behaviors_.size(); ++i) {
-            if (current_behaviors_[i] && current_behaviors_[i]->checkStopCondition(predicate_list_)) {
+    if (!err_cond) {
+        for (int i = 0; i < current_behaviors.size(); ++i) {
+            if (current_behaviors[i]->checkStopCondition(predicate_list_)) {
                 stop_cond = true;
-                if (!removeBehavior(current_behaviors_[i])) {
-                    Logger::log() << Logger::Error << "could not remove current behavior \'" << current_behaviors_[i]->getName() << "\' (on stop condition)" << Logger::endl;
-                    printCurrentBehaviors();
-                    error();
-                    return;
-                }
+                break;
             }
         }
     }
+
     predicate_list_->IN_ERROR = err_cond;
 
     if (stop_cond || err_cond) {
+        const std::string& next_state_name = current_state_->getNextState(predicate_list_);
+        Logger::log() << Logger::Info << "switching to new state: " << next_state_name
+            << Logger::endl;
+        current_state_ = getState(next_state_name);
+        if (!current_state_) {
+            Logger::log() << Logger::Error << "could not switch to new state: " << next_state_name << Logger::endl;
+            error();
+        }
+        diag_ss_rt_.addBehaviorSwitch(state_graphs_[current_state_->getStateName()], now, (err_cond?DiagBehaviorSwitch::ERROR:DiagBehaviorSwitch::STOP), predicate_list_);
+        diag_bs_sync_.Set(diag_ss_rt_);
 
-        int current_behaviors_count = currentBehaviorsCount();
-        for (int i = 0; i < possible_behaviors_.size(); ++i) {
-            int found_count = 0;
-            bool init_cond = true;
-            for (int j = 0; j < possible_behaviors_[i].size(); ++j) {
-                if (isCurrentBehavior(possible_behaviors_[i][j])) {
-                    ++found_count;
-                }
-                else {
-                    if (!behaviors_[possible_behaviors_[i][j]]->checkInitialCondition(predicate_list_)) {
-                        init_cond = false;
-                    }
-                }
-            }
-            if (found_count == current_behaviors_count && init_cond) {
-                if (new_behavior_idx == -1) {
-                    new_behavior_idx = i;
-                    diag_ss_rt_.addBehaviorSwitch(new_behavior_idx, now, (err_cond?DiagBehaviorSwitch::ERROR:DiagBehaviorSwitch::STOP), predicate_list_);
-                    diag_bs_sync_.Set(diag_ss_rt_);
-                }
-                else {
-                    Logger::log() << Logger::Error << "two or more behaviors have the same initial condition"
-                        << Logger::endl;
-                    printCurrentBehaviors();
-                    error();
-                    return;
-                }
-            }
-        }
-/*
-        for (int i = 0; i < behaviors_.size(); ++i) {
-            if ( behaviors_[i]->checkInitialCondition(predicate_list_) ) {
-                if (!addBehavior(behaviors_[i])) {
-                    Logger::log() << Logger::Error << "could not add behavior \'" << behaviors_[i]->getName() << "\' (on init condition)" << Logger::endl;
-                    printCurrentBehaviors();
-                    error();
-                    return;
-                }
-            }
-        }
-*/
-        if (new_behavior_idx != -1) {
-            behavior_switch = true;
-            std::string b;
-            
-            for (int j = 0; j < possible_behaviors_[new_behavior_idx].size(); ++j) {
-                b += behaviors_[possible_behaviors_[new_behavior_idx][j]]->getName() + ", ";
-                if (!isCurrentBehavior(possible_behaviors_[new_behavior_idx][j])) {
-                    if (!addBehavior(behaviors_[possible_behaviors_[new_behavior_idx][j]])) {
-                        Logger::log() << Logger::Error << "could not add behavior"
-                            << Logger::endl;
-                        printCurrentBehaviors();
-                        error();
-                        return;
-                    }
-                }
-            }
-            Logger::log() << Logger::Info << "switched to new behavior: " << b
-                << Logger::endl;
-        }
-        else {
-            Logger::log() << Logger::Error << "could not find new behavior"
-                << Logger::endl;
-            printCurrentBehaviors();
-            error();
-            return;
-        }
-        if (!output_scope_->isComplete()) {
-            Logger::log() << Logger::Error << "output scope is incomplete" << Logger::endl;
-            printCurrentBehaviors();
-            error();
-            return;
-        }
+        behavior_switch = true;
     }
 
-//    bool pred_err = current_behavior->checkErrorCondition(predicate_list_);
-//    predicate_list_->IN_ERROR = pred_err;
-/*
-    if (pred_err) {
-        int next_behavior_index = -1;
-        for (int i = 0; i < behaviors_.size(); ++i) {
-            if ( behaviors_[i]->checkInitialCondition(predicate_list_) ) {
-                if (next_behavior_index == -1) {
-                    next_behavior_index = i;
-                }
-                else {
-                    Logger::In in("MasterComponent::updateHook");
-                    Logger::log() << Logger::Error << "two or more behaviors have the same initial condition (err): current_behavior="
-                        << current_behavior_->getName()
-                        << ", behaviors: " << behaviors_[i]->getName() << ", " << behaviors_[next_behavior_index]->getName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_)
-                        << Logger::endl;
-                    diag_ss_rt_.addBehaviorSwitch(-1, now, DiagBehaviorSwitch::ERROR, predicate_list_);
-                    error();
-                    return;
-                }
-            }
-        }
-        if (next_behavior_index == -1) {
-            Logger::In in("MasterComponent::updateHook");
-            Logger::log() << Logger::Error << "cannot switch to new behavior (initial condition, err): current_behavior="
-                << current_behavior_->getName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_) << Logger::endl;
-            diag_ss_rt_.addBehaviorSwitch(-1, now, DiagBehaviorSwitch::ERROR, predicate_list_);
-            error();
-            return;
-        }
-        else {
-                Logger::log() << Logger::Info << "behavior_switch (error) from "
-                    << current_behavior_->getName()
-                    << " to " << behaviors_[next_behavior_index]->getName()
-                    << Logger::endl;
-
-            current_behavior_ = behaviors_[next_behavior_index];
-            diag_ss_rt_.addBehaviorSwitch(next_behavior_index, now, DiagBehaviorSwitch::ERROR, predicate_list_);
-            diag_bs_sync_.Set(diag_ss_rt_);
-
-            behavior_switch_ = true;
-        }
-    }
-    else {
-        //
-        // check stop condition
-        //
-        bool pred_stop = current_behavior->checkStopCondition(predicate_list_);
-
-        if (pred_stop) {
-            int next_behavior_index = -1;
-            for (int i = 0; i < behaviors_.size(); ++i) {
-                if ( behaviors_[i]->checkInitialCondition(predicate_list_) ) {
-                    if (next_behavior_index == -1) {
-                        next_behavior_index = i;
-                    }
-                    else {
-                        Logger::In in("MasterComponent::updateHook");
-                        Logger::log() << Logger::Error << "two or more behaviors have the same initial condition (stop): current_behavior="
-                            << current_behavior_->getName()
-                            << ", behaviors: " << behaviors_[i]->getName() << ", " << behaviors_[next_behavior_index]->getName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_)
-                            << Logger::endl;
-                        diag_ss_rt_.addBehaviorSwitch(-1, now, DiagBehaviorSwitch::STOP, predicate_list_);
-                        error();
-                        return;
-                    }
-                }
-            }
-            if (next_behavior_index == -1) {
-                Logger::In in("MasterComponent::updateHook");
-                Logger::log() << Logger::Error << "cannot switch to new behavior (initial condition, stop): current_behavior="
-                    << current_behavior_->getName() << ", predicates: " << master_service_->getPredicatesStr(predicate_list_) << Logger::endl;
-                diag_ss_rt_.addBehaviorSwitch(-1, now, DiagBehaviorSwitch::STOP, predicate_list_);
-                error();
-                return;
-            }
-            else {
-                Logger::log() << Logger::Info << "behavior_switch (stop) from "
-                    << current_behavior_->getName()
-                    << " to " << behaviors_[next_behavior_index]->getName()
-                    << Logger::endl;
-
-                current_behavior_ = behaviors_[next_behavior_index];
-                diag_ss_rt_.addBehaviorSwitch(next_behavior_index, now, DiagBehaviorSwitch::STOP, predicate_list_);
-                diag_bs_sync_.Set(diag_ss_rt_);
-
-                behavior_switch_ = true;
-            }
-        }
-    }
-*/
     //
     // if the behavior has changed, reorganize the graph
     //
 
     if (behavior_switch) {
-//        std::string curr_beh;   // TODO: this string allocates - remove it after testing
 
+        int new_behavior_idx = state_graphs_[current_state_->getStateName()];
         if (!switchToConfiguration_(new_behavior_idx)) {
             Logger::log() << Logger::Error << "could not switch graph configuration" << Logger::endl;
             error();
             return;
         }
-
-        current_behavior_idx_ = new_behavior_idx;
-
-/*
-        for (int i = 0; i < current_behaviors_.size(); ++i) {
-            if (current_behaviors_[i]) {
-                curr_beh += current_behaviors_[i]->getName() + ", ";
-            }
-        }
-
-        for (int i = 0; i < possible_behaviors_.size(); ++i) {
-            bool match = true;
-            for (int j = 0; j < possible_behaviors_[i].size(); ++j) {
-                if (!isCurrentBehavior(possible_behaviors_[i][j])) {
-                    match = false;
-                }
-            }
-            if (match) {
-                std::string curr_conf;   // TODO: this string allocates - remove it after testing
-
-                for (int j = 0; j < possible_behaviors_[i].size(); ++j) {
-                    curr_conf += behaviors_[possible_behaviors_[i][j]]->getName() + ", ";
-                }
-
-                Logger::log() << Logger::Info << "behavior_switch b: " << curr_beh
-                    << ";   conf: " << curr_conf << Logger::endl;
-
-                switchToConfiguration_(i);
-                behavior_switch_ = false;
-                break;
-            }
-        }
-        if (behavior_switch) {
-            Logger::log() << Logger::Error << "could not switch graph configuration, b: " << curr_beh << Logger::endl;
-            error();
-            return;
-        }
-*/
     }
 
-/*    if (behavior_switch_) {
-//        const std::string& behavior_name = current_behavior_->getName();
-
-        for (int i = 0; i < behaviors_.size(); ++i) {
-            if (behaviors_[i]->getName() == behavior_name) {
-                switchToConfiguration_(i);
-                break;
-            }
-        }
-        behavior_switch_ = false;
-    }
-*/
     if (scheme_->getTaskState() != RTT::TaskContext::Running) {
         RTT::log(RTT::Error) << "Component is not in the running state: " << scheme_->getName() << RTT::endlog();
         error();
