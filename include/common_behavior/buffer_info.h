@@ -50,24 +50,27 @@ public:
                         const std::string& interface_alias,
                         double event = false,
                         double period_min = 0.0,
-                        double period_avg = 0.0,
-                        double period_max = 0.0,
-                        double period_sim_max = 0.0)
+                        double event_no_data = false,
+                        double first_timeout = 0.0,
+                        double next_timeout = 0.0,
+                        double first_timeout_sim = 0.0)
 
         : BufferInfo(interface_type, interface_alias)
         , event_(event)
+        , event_no_data_(event_no_data)
         , period_min_(period_min)
-        , period_avg_(period_avg)
-        , period_max_(period_max)
-        , period_sim_max_(period_sim_max)
+        , first_timeout_(first_timeout)
+        , next_timeout_(next_timeout)
+        , first_timeout_sim_(first_timeout_sim)
     {
     }
 
     bool event_;
+    bool event_no_data_;
     double period_min_;
-    double period_avg_;
-    double period_max_;
-    double period_sim_max_;
+    double first_timeout_;
+    double next_timeout_;
+    double first_timeout_sim_;
 };
 
 class OutputBufferInfo : public BufferInfo {

@@ -37,12 +37,14 @@
 #include <vector>
 #include <string>
 
-//#include "common_behavior/abstract_behavior.h"
 #include "common_behavior/input_data.h"
 #include "common_behavior/master_service_requester.h"
 #include "common_behavior/master_service.h"
 
 using namespace RTT;
+
+typedef std::shared_ptr<common_behavior::BehaviorBase > BehaviorBasePtr;
+typedef std::shared_ptr<const common_behavior::BehaviorBase > BehaviorBaseConstPtr;
 
 class DiagBehaviorSwitch {
 public:
@@ -120,20 +122,51 @@ private:
     int idx_;
 };
 
-void recursiveAddBehavior(const std::vector<std::shared_ptr<common_behavior::BehaviorBase > >& behaviors, int start_idx,
-                            common_behavior::OutputScopeBasePtr& os, std::vector<std::vector<int> >& out, std::vector<int > bv = std::vector<int >()) {
-    if (os->isComplete()) {
-        out.push_back(bv);
-        return;
+bool componentsInConflict(const std::string& c1, const std::string& c2, const std::set<std::pair<std::string, std::string > >& conflicting_components) const {
+    std::pair<std::string, std::string > p1(c1, c2);
+    std::pair<std::string, std::string > p2(c2, c1);
+    if (conflicting_components_.find(p1) == conflicting_components.end() &&
+        conflicting_components_.find(p2) == conflicting_components.end()) {
+        return false;
     }
+    return true;
+}
 
+bool behaviorsInConflict(const BehaviorBaseConstPtr &b1, const BehaviorBaseConstPtr &b2, const std::set<std::pair<std::string, std::string > >& conflicting_components) const {
+    const std::vector<std::string >& b1_comp_vec = b1->getRunningComponents();
+    const std::vector<std::string >& b2_comp_vec = b2->getRunningComponents();
+    for (int i = 0; i < b1_comp_vec.size(); ++i) {
+        for (int j = 0; j < b2_comp_vec.size(); ++j) {
+            if (componentsInConflict(b1_comp_vec[i], b2_comp_vec[j], conflicting_components)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void recursiveAddBehavior(const std::vector<BehaviorBasePtr >& behaviors, int start_idx,
+                            std::vector<std::vector<int> >& out, std::vector<int > bv = std::vector<int >()) {
+//    if (os->isComplete()) {
+//        out.push_back(bv);
+//        return;
+//    }
+
+//TODO:
     for (int i = start_idx; i < behaviors.size(); ++i) {
-        if ( os->isCompatible(behaviors[i]->getOutputScope()) ) {
-            os->add(behaviors[i]->getOutputScope());
+        bool compatible = true;
+        for (int j = 0; j < bv.size(); ++j) {
+            if (behaviorsInConflict(behaviors[i], behaviors[bv[j]], conflicting_components)) {
+                compatible = false;
+                break;
+            }
+        }
+        if ( compatible ) {
+//            os->add(behaviors[i]->getOutputScope());
             bv.push_back(i);
             recursiveAddBehavior(behaviors, i+1, os, out, bv);
             bv.pop_back();
-            os->substract(behaviors[i]->getOutputScope());
+//            os->substract(behaviors[i]->getOutputScope());
         }
     }
 }
@@ -155,16 +188,17 @@ public:
     bool addConmanScheme(RTT::TaskContext* scheme);
 
 private:
-    bool addBehavior(const std::shared_ptr<common_behavior::BehaviorBase >& ptr);
-    bool removeBehavior(const std::shared_ptr<common_behavior::BehaviorBase >& ptr);
+    bool addBehavior(const BehaviorBasePtr& ptr);
+    bool removeBehavior(const BehaviorBasePtr& ptr);
+    void calculateConflictingComponents();
     void printCurrentBehaviors() const;
     bool isCurrentBehavior(const std::string& behavior_name) const;
     bool isCurrentBehavior(int behavior_idx) const;
     int currentBehaviorsCount() const;
     bool isGraphOk() const;
 
-    std::vector<std::shared_ptr<common_behavior::BehaviorBase > > behaviors_;
-    std::vector<std::shared_ptr<common_behavior::BehaviorBase > > current_behaviors_;
+    std::vector<BehaviorBasePtr > behaviors_;
+    std::vector<BehaviorBasePtr > current_behaviors_;
     std::vector<std::vector<int> > possible_behaviors_;
     int current_behavior_idx_;
 
@@ -197,6 +231,8 @@ private:
     RTT::os::TimeService::nsecs last_update_time_;
 
     int behavior_switch_history_length_;
+
+    std::set<std::pair<std::string, std::string > > conflicting_components_;
 };
 
 MasterComponent::MasterComponent(const std::string &name)
@@ -262,7 +298,7 @@ bool MasterComponent::addConmanScheme(RTT::TaskContext* scheme) {
     return scheme_->setActivity( new RTT::extras::SlaveActivity(this->getActivity(), scheme_->engine()));
 }
 
-bool MasterComponent::addBehavior(const std::shared_ptr<common_behavior::BehaviorBase >& ptr) {
+bool MasterComponent::addBehavior(const BehaviorBasePtr& ptr) {
     if (!output_scope_->isCompatible(ptr->getOutputScope())) {
         return false;
     }
@@ -276,15 +312,64 @@ bool MasterComponent::addBehavior(const std::shared_ptr<common_behavior::Behavio
     return false;
 }
 
-bool MasterComponent::removeBehavior(const std::shared_ptr<common_behavior::BehaviorBase >& ptr) {
+bool MasterComponent::removeBehavior(const BehaviorBasePtr& ptr) {
     for (int i = 0; i < current_behaviors_.size(); ++i) {
         if (current_behaviors_[i] && current_behaviors_[i]->getName() == ptr->getName()) {
             output_scope_->substract(ptr->getOutputScope());
-            current_behaviors_[i] = std::shared_ptr<common_behavior::BehaviorBase >();
+            current_behaviors_[i] = BehaviorBasePtr();
             return true;
         }
     }
     return false;
+}
+
+void MasterComponent::calculateConflictingComponents() {
+    for (int i = 0; i < scheme_peers_.size(); ++i) {
+        Service::shared_ptr sv = scheme_peers_[i]->provides();
+        RTT::Service::PortNames comp_ports = sv->getPortNames();
+        for (int j = 0; j < comp_ports.size(); ++j) {
+            RTT::base::InputPortInterface* ipi = dynamic_cast<RTT::base::InputPortInterface* >( sv->getPort(comp_ports[j]) );
+            // check input ports only
+            if (!ipi) {
+                continue;
+            }
+            std::vector<std::string > comp_out;
+            std::vector<std::string > port_out;
+            std::list<internal::ConnectionManager::ChannelDescriptor> chns = ipi->getManager()->getConnections();
+            for(std::list<internal::ConnectionManager::ChannelDescriptor>::iterator k = chns.begin(); k != chns.end(); k++) {
+                base::ChannelElementBase::shared_ptr bs = k->get<1>();
+
+                if(bs->getInputEndPoint()->getPort() != 0) {
+                    if (bs->getInputEndPoint()->getPort()->getInterface() != 0 ){
+                        comp_out.push_back( bs->getInputEndPoint()->getPort()->getInterface()->getOwner()->getName() );
+                        port_out.push_back( bs->getInputEndPoint()->getPort()->getName() );
+                    }
+                }
+            }
+
+            if (comp_out.size() > 1) {
+                RTT::log(RTT::Info) << "Conflicting components for input port " << scheme_peers_[i]->getName() << "." << comp_ports[j] << ":" << RTT::endlog();
+                for (int k = 0; k < comp_out.size(); ++k) {
+                    RTT::log(RTT::Info) << "    \'" << comp_out[k] << "\' (port: \'" << port_out[k] << "\')" << RTT::endlog();
+                }
+            }
+
+            for (int k = 0; k < comp_out.size(); ++k) {
+                for (int l = k+1; l < comp_out.size(); ++l) {
+                    std::pair<std::string, std::string > p1(comp_out[k], comp_out[l]);
+                    std::pair<std::string, std::string > p2(comp_out[l], comp_out[k]);
+                    if (conflicting_components_.find(p1) == conflicting_components_.end() &&
+                        conflicting_components_.find(p2) == conflicting_components_.end()) {
+                        conflicting_components_.insert(p1);
+                    }
+                }
+            }
+        }
+    }
+    RTT::log(RTT::Info) << "Conflicting components pairs:" << RTT::endlog();
+    for (std::set<std::pair<std::string, std::string > >::const_iterator it = conflicting_components_.begin(); it != conflicting_components_.end(); ++it) {
+        RTT::log(RTT::Info) << "    " << it->first << ", " << it->second << RTT::endlog();
+    }
 }
 
 bool MasterComponent::configureHook() {
@@ -353,6 +438,15 @@ bool MasterComponent::configureHook() {
         }
     }
 */
+
+    // retrieve the vector of peers of conman scheme
+    TaskContext::PeerList scheme_peers_names = scheme_->getPeerList();
+    for (int pi = 0; pi < scheme_peers_names.size(); ++pi) {
+        scheme_peers_.push_back( scheme_->getPeer(scheme_peers_names[pi]) );
+    }
+
+    // prepare list of conflicting components
+    calculateConflictingComponents();
 
     // calculate list of all possible complete behaviors
     common_behavior::OutputScopeBasePtr os = master_service_->allocateOutputScope();
@@ -520,11 +614,6 @@ bool MasterComponent::configureHook() {
         addGraphConfiguration_(i, vec_stopped, vec_running);
     }
 */
-    // retrieve the vector of peers of conman scheme
-    TaskContext::PeerList scheme_peers_names = scheme_->getPeerList();
-    for (int pi = 0; pi < scheme_peers_names.size(); ++pi) {
-        scheme_peers_.push_back( scheme_->getPeer(scheme_peers_names[pi]) );
-    }
 
     in_data_ = master_service_->getDataSample();
     if (!in_data_) {
