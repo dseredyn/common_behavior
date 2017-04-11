@@ -84,7 +84,7 @@ class MasterService: public RTT::Service {
   virtual std::string getInitialState() const = 0;
 
   virtual PredicateListPtr allocatePredicateList() = 0;
-  virtual void calculatePredicates(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, PredicateListPtr&) const = 0;
+  virtual void calculatePredicates(const InputDataConstPtr&, const std::vector<const RTT::TaskContext*>&, PredicateListPtr&) const = 0;
 
   // this method may not be RT-safe
   virtual std::string getPredicatesStr(const PredicateListConstPtr&) const = 0;

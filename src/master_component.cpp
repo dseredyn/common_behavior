@@ -220,6 +220,7 @@ private:
     RTT::OperationCaller<bool(int)> switchToConfiguration_;
 
     std::vector<TaskContext* > scheme_peers_;
+    std::vector<const TaskContext* > scheme_peers_const_;
     std::set<std::string > switchable_components_;
     std::vector<std::set<std::string > > running_components_in_behavior_;
 
@@ -452,6 +453,7 @@ bool MasterComponent::configureHook() {
     TaskContext::PeerList scheme_peers_names = scheme_->getPeerList();
     for (int pi = 0; pi < scheme_peers_names.size(); ++pi) {
         scheme_peers_.push_back( scheme_->getPeer(scheme_peers_names[pi]) );
+        scheme_peers_const_.push_back( scheme_->getPeer(scheme_peers_names[pi]) );
     }
 /*
     // prepare list of conflicting components
@@ -594,9 +596,9 @@ bool MasterComponent::isGraphOk() const {
 
     int current_graph_id = state_graphs_.find(current_state_->getStateName())->second;
 
-    for (int i = 0; i < scheme_peers_.size(); ++i) {
-        const std::string& name = scheme_peers_[i]->getName();
-        RTT::TaskContext::TaskState state = scheme_peers_[i]->getTaskState();
+    for (int i = 0; i < scheme_peers_const_.size(); ++i) {
+        const std::string& name = scheme_peers_const_[i]->getName();
+        RTT::TaskContext::TaskState state = scheme_peers_const_[i]->getTaskState();
 
         if (running_components_in_behavior_[current_graph_id].find(name) != running_components_in_behavior_[current_graph_id].end()) {
             // switchable component that should be running in current behavior
@@ -659,7 +661,7 @@ void MasterComponent::updateHook() {
         graphOk = isGraphOk();
     }
 
-    master_service_->calculatePredicates(in_data_, scheme_peers_, predicate_list_);
+    master_service_->calculatePredicates(in_data_, scheme_peers_const_, predicate_list_);
     predicate_list_->CURRENT_BEHAVIOR_OK = graphOk;
 
 //    Logger::log() << Logger::Info << "current state: " << current_state_->getStateName()

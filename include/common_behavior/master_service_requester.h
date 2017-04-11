@@ -98,7 +98,7 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<std::string()> getInitialState;
 
   RTT::OperationCaller<PredicateListPtr() > allocatePredicateList;
-  RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, PredicateListPtr&) > calculatePredicates;
+  RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<const RTT::TaskContext*>&, PredicateListPtr&) > calculatePredicates;
   RTT::OperationCaller<std::string(const PredicateListConstPtr&) > getPredicatesStr;
 
   RTT::OperationCaller<void()> iterationEnd;
