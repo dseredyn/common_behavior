@@ -41,8 +41,11 @@
 namespace common_behavior {
 
 template <typename Tfrom, typename Tto >
-class ConverterComponent : public RTT::TaskContext {
+class Converter {
 public:
+
+    typedef Tfrom TypeFrom;
+    typedef Tto TypeTo;
 
     static bool isCompatible(RTT::base::PortInterface *from, RTT::base::PortInterface *to) {
         if (!from || !to) {
@@ -58,29 +61,37 @@ public:
         return true;
     }
 
+    virtual void convert(const Tfrom&, Tto&) const = 0;
+};
+
+template <typename C >
+class ConverterComponent : public RTT::TaskContext {
+public:
     explicit ConverterComponent(const std::string &name)
         : RTT::TaskContext(name)
         , port_in_("data_INPORT")
-        , port_out_("data_OUTPORT") {
+        , port_out_("data_OUTPORT")
+        , converter_(new C())
+    {
         ports()->addPort(port_in_);
         ports()->addPort(port_out_);
     }
 
     void updateHook() {
         if (port_in_.read(in_) == RTT::NewData) {
-            convert(in_, out_);
+            converter_->convert(in_, out_);
             port_out_.write(out_);
         }
     }
 
-    virtual void convert(const Tfrom&, Tto&) const = 0;
-
 private:
-    RTT::InputPort<Tfrom > port_in_;
-    Tfrom in_;
+    RTT::InputPort<typename C::TypeFrom > port_in_;
+    typename C::TypeFrom in_;
 
-    RTT::OutputPort<Tto > port_out_;
-    Tto out_;
+    RTT::OutputPort<typename C::TypeTo > port_out_;
+    typename C::TypeTo out_;
+
+    std::shared_ptr<C > converter_;
 };
 
 class PortConverterFactory
@@ -127,9 +138,13 @@ public:
 
 #define LITERAL_registrar_port_converter_(X) registrar_port_converter_##X
 #define EXPAND_registrar_port_converter_(X) LITERAL_registrar_port_converter_(X)
+
+#define LITERAL_port_converter_component_name__(X) Component##X
+#define EXPAND_port_converter_component_name_(X) LITERAL_port_converter_component_name__(X)
  
-#define REGISTER_PORT_CONVERTER( CONVERTER_CLASS ) static common_behavior::PortConverterRegistrar<CONVERTER_CLASS > EXPAND_registrar_port_converter_(__LINE__)(#CONVERTER_CLASS);\
- ORO_LIST_COMPONENT_TYPE(CONVERTER_CLASS);
+#define REGISTER_PORT_CONVERTER( CONVERTER_CLASS ) static common_behavior::PortConverterRegistrar<CONVERTER_CLASS > EXPAND_registrar_port_converter_(__LINE__)("Component"#CONVERTER_CLASS);\
+ typedef common_behavior::ConverterComponent<CONVERTER_CLASS > EXPAND_port_converter_component_name_(CONVERTER_CLASS);\
+ ORO_LIST_COMPONENT_TYPE(EXPAND_port_converter_component_name_(CONVERTER_CLASS));
 
 };  // namespace common_behavior
 
