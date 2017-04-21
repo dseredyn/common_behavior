@@ -237,6 +237,7 @@ private:
 
     RTT::Seconds last_exec_time_, last_exec_period_;
     RTT::os::TimeService::nsecs last_update_time_;
+    RTT::os::TimeService::Seconds scheme_time_;
 
     int behavior_switch_history_length_;
 
@@ -246,6 +247,7 @@ private:
 MasterComponent::MasterComponent(const std::string &name)
     : TaskContext(name, PreOperational)
     , behavior_switch_history_length_(5)
+    , scheme_time_(0)
 {
     this->addOperation("getDiag", &MasterComponent::getDiag, this, RTT::ClientThread);
 
@@ -293,6 +295,7 @@ std::string MasterComponent::getDiag() {
     strs << "<pr v=\"" << master_service_->getPredicatesStr(predicate_list_) << "\" />";
 
     strs << "<p>" << last_exec_period_ << "</p>";
+    strs << "<t_tf>" << scheme_time_ << "</t_tf>";
     strs << "</mcd>";
 
     return strs.str();
@@ -723,7 +726,12 @@ void MasterComponent::updateHook() {
         error();
         return;
     }
+
+    RTT::os::TimeService::nsecs time_1 = RTT::os::TimeService::Instance()->getNSecs();
     scheme_->update();
+    RTT::os::TimeService::nsecs time_2 = RTT::os::TimeService::Instance()->getNSecs();
+
+    scheme_time_ = RTT::nsecs_to_Seconds(time_2) - RTT::nsecs_to_Seconds(time_1);
 
     // iterationEnd callback can be used by e.g. Gazebo simulator
     master_service_->iterationEnd();
