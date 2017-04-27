@@ -584,6 +584,9 @@ bool MasterComponent::configureHook() {
         return false;
     }
 
+    // run this function for proper initialization of predicate functions
+    master_service_->calculatePredicates(in_data_, scheme_peers_const_, predicate_list_);
+
     return true;
 }
 
@@ -694,8 +697,8 @@ void MasterComponent::updateHook() {
 
     if (stop_cond || err_cond) {
         const std::string& next_state_name = current_state_->getNextState(predicate_list_);
-        Logger::log() << Logger::Info << "switching to new state: " << next_state_name
-            << Logger::endl;
+//        Logger::log() << Logger::Info << "switching to new state: " << next_state_name
+//            << Logger::endl;
         current_state_ = getState(next_state_name);
         if (!current_state_) {
             Logger::log() << Logger::Error << "could not switch to new state: " << next_state_name << Logger::endl;
