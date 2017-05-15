@@ -35,6 +35,7 @@
 #include <algorithm>
 
 #include <vector>
+#include <set>
 #include <string>
 
 #include "common_behavior/input_data.h"
