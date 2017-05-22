@@ -43,28 +43,24 @@ class MasterServiceRequester : public RTT::ServiceRequester {
  public:
   explicit MasterServiceRequester(RTT::TaskContext *owner)
     : RTT::ServiceRequester("master", owner)
-    , initBuffers("initBuffers")
-    , readIpcPorts("readIpcPorts")
-    , readInternalPorts("readInternalPorts")
+    , initBuffersData("initBuffersData")
+    , readBuffers("readBuffers")
     , writePorts("writePorts")
     , getDataSample("getDataSample")
     , getLowerInputBuffers("getLowerInputBuffers")
     , getUpperInputBuffers("getUpperInputBuffers")
     , getLowerOutputBuffers("getLowerOutputBuffers")
     , getUpperOutputBuffers("getUpperOutputBuffers")
+    , getBehaviors("getBehaviors")
     , getStates("getStates")
     , getInitialState("getInitialState")
-    , getLatchedConnections("getLatchedConnections")
     , allocatePredicateList("allocatePredicateList")
     , calculatePredicates("calculatePredicates")
     , getPredicatesStr("getPredicatesStr")
-    , getErrorReasonStr("getErrorReasonStr")
-    , getErrorReasonSample("getErrorReasonSample")
     , iterationEnd("iterationEnd")
   {
-    this->addOperationCaller(initBuffers);
-    this->addOperationCaller(readIpcPorts);
-    this->addOperationCaller(readInternalPorts);
+    this->addOperationCaller(initBuffersData);
+    this->addOperationCaller(readBuffers);
     this->addOperationCaller(writePorts);
     this->addOperationCaller(getDataSample);
 
@@ -73,25 +69,20 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     this->addOperationCaller(getLowerOutputBuffers);
     this->addOperationCaller(getUpperOutputBuffers);
 
+    this->addOperationCaller(getBehaviors);
     this->addOperationCaller(getStates);
     this->addOperationCaller(getInitialState);
-
-    this->addOperationCaller(getLatchedConnections);
 
     this->addOperationCaller(allocatePredicateList);
     this->addOperationCaller(calculatePredicates);
     this->addOperationCaller(getPredicatesStr);
 
-    this->addOperationCaller(getErrorReasonStr);
-    this->addOperationCaller(getErrorReasonSample);
-
     this->addOperationCaller(iterationEnd);
   }
 
   // OROCOS ports operations
-  RTT::OperationCaller<void (InputDataPtr&)> initBuffers;
-  RTT::OperationCaller<void(InputDataPtr&)> readIpcPorts;
-  RTT::OperationCaller<void(InputDataPtr&)> readInternalPorts;
+  RTT::OperationCaller<void (InputDataPtr&)> initBuffersData;
+  RTT::OperationCaller<void(InputDataPtr&)> readBuffers;
   RTT::OperationCaller<void (InputDataPtr&)> writePorts;
   RTT::OperationCaller<InputDataPtr()> getDataSample;
 
@@ -102,18 +93,13 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<void(std::vector<OutputBufferInfo >&)> getUpperOutputBuffers;
 
   // FSM parameters
+  RTT::OperationCaller<std::vector<std::string >()> getBehaviors;
   RTT::OperationCaller<std::vector<std::string >()> getStates;
   RTT::OperationCaller<std::string()> getInitialState;
 
-  RTT::OperationCaller<std::vector<std::pair<std::string, std::string > >() > getLatchedConnections;
-
   RTT::OperationCaller<PredicateListPtr() > allocatePredicateList;
-  RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<RTT::TaskContext*>&, const std::string&, PredicateListPtr&) > calculatePredicates;
+  RTT::OperationCaller<void(const InputDataConstPtr&, const std::vector<const RTT::TaskContext*>&, PredicateListPtr&) > calculatePredicates;
   RTT::OperationCaller<std::string(const PredicateListConstPtr&) > getPredicatesStr;
-
-  // this method may not be RT-safe
-  RTT::OperationCaller<std::string(AbstractConditionCauseConstPtr)> getErrorReasonStr;
-  RTT::OperationCaller<AbstractConditionCausePtr()> getErrorReasonSample;
 
   RTT::OperationCaller<void()> iterationEnd;
 };
