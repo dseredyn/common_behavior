@@ -28,9 +28,6 @@
 #ifndef COMMON_BEHAVIOR_ABSTRACT_PORT_CONVERTER_H__
 #define COMMON_BEHAVIOR_ABSTRACT_PORT_CONVERTER_H__
 
-#include "common_behavior/input_data.h"
-#include "common_behavior/abstract_predicate_list.h"
-
 #include <map>
 #include <vector>
 #include <string>
