@@ -635,6 +635,11 @@ bool MasterComponent::isGraphOk() const {
 
 void MasterComponent::updateHook() {
 
+    if (!master_service_->readBuffers()) {
+        return;
+        // TODO
+    }
+
     // What time is it
     RTT::os::TimeService::nsecs now = RTT::os::TimeService::Instance()->getNSecs();
     RTT::os::TimeService::Seconds
@@ -649,7 +654,7 @@ void MasterComponent::updateHook() {
     last_exec_time_ = time;
 
     master_service_->initBuffersData(in_data_);
-    master_service_->readBuffers(in_data_);
+    master_service_->getBuffers(in_data_);
 
     master_service_->writePorts(in_data_);
 

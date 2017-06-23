@@ -53,7 +53,8 @@ public:
                         double event_no_data = false,
                         double first_timeout = 0.0,
                         double next_timeout = 0.0,
-                        double first_timeout_sim = 0.0)
+                        double first_timeout_sim = 0.0,
+                        const std::string& converter_name = std::string())
 
         : BufferInfo(interface_type, interface_alias)
         , event_(event)
@@ -62,6 +63,7 @@ public:
         , first_timeout_(first_timeout)
         , next_timeout_(next_timeout)
         , first_timeout_sim_(first_timeout_sim)
+        , converter_name_(converter_name)
     {
     }
 
@@ -71,6 +73,7 @@ public:
     double first_timeout_;
     double next_timeout_;
     double first_timeout_sim_;
+    std::string converter_name_;
 };
 
 class OutputBufferInfo : public BufferInfo {
