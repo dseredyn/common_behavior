@@ -45,6 +45,8 @@ class MasterService: public RTT::Service {
  public:
   explicit MasterService(RTT::TaskContext* owner) :
       RTT::Service("master", owner) {
+    this->addOperation("getIntervalInfo", &MasterService::getIntervalInfo, this, RTT::ClientThread);
+
     this->addOperation("initBuffersData", &MasterService::initBuffersData, this, RTT::ClientThread);
     this->addOperation("readBuffers", &MasterService::readBuffers, this, RTT::ClientThread);
     this->addOperation("getBuffers", &MasterService::getBuffers, this, RTT::ClientThread);
@@ -56,6 +58,8 @@ class MasterService: public RTT::Service {
     this->addOperation("getLowerOutputBuffers", &MasterService::getLowerOutputBuffers, this, RTT::ClientThread);
     this->addOperation("getUpperOutputBuffers", &MasterService::getUpperOutputBuffers, this, RTT::ClientThread);
 
+    this->addOperation("getBufferGroups", &MasterService::getBufferGroups, this, RTT::ClientThread);
+
     this->addOperation("getBehaviors", &MasterService::getBehaviors, this, RTT::ClientThread);
     this->addOperation("getStates", &MasterService::getStates, this, RTT::ClientThread);
     this->addOperation("getInitialState", &MasterService::getInitialState, this, RTT::ClientThread);
@@ -66,6 +70,8 @@ class MasterService: public RTT::Service {
 
     this->addOperation("iterationEnd", &MasterService::iterationEnd, this, RTT::ClientThread);
   }
+
+  virtual bool getIntervalInfo(double &min, double &first, double &next) const = 0;
 
   // OROCOS ports operations
   virtual void initBuffersData(InputDataPtr& in_data) const = 0;
@@ -79,6 +85,9 @@ class MasterService: public RTT::Service {
   virtual void getUpperInputBuffers(std::vector<InputBufferInfo >&) const = 0;
   virtual void getLowerOutputBuffers(std::vector<OutputBufferInfo >&) const = 0;
   virtual void getUpperOutputBuffers(std::vector<OutputBufferInfo >&) const = 0;
+
+  // buffer groups
+  virtual std::vector<std::vector<std::string > > getBufferGroups() const = 0;
 
   // FSM parameters
   virtual std::vector<std::string > getBehaviors() const = 0;

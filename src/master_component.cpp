@@ -243,6 +243,8 @@ private:
     int behavior_switch_history_length_;
 
     std::set<std::pair<std::string, std::string > > conflicting_components_;
+
+    int counter_;
 };
 
 MasterComponent::MasterComponent(const std::string &name)
@@ -382,6 +384,14 @@ bool MasterComponent::configureHook() {
         RTT::log(RTT::Error) << "Unable to load common_behavior::MasterService" << RTT::endlog();
         return false;
     }
+
+//    use_interval_ = master_service_->getIntervalInfo(interval_min_, interval_first_, interval_next_);
+//    if (use_interval_) {
+//        RTT::log(RTT::Info) << "Using interval trigger method: min: " << interval_min_ << ", first: " << interval_first_ << ", next: " << interval_next_ << RTT::endlog();
+//    }
+//    else {
+//        RTT::log(RTT::Info) << "Not using interval trigger method" << RTT::endlog();
+//    }
 
     predicate_list_ = master_service_->allocatePredicateList();
     if (!predicate_list_) {
@@ -593,6 +603,11 @@ bool MasterComponent::configureHook() {
 
 bool MasterComponent::startHook() {
     first_step_ = true;
+//    if (use_interval_) {
+//        arm_(0, interval_first_);
+//        use_interval_first_ = false;
+//    }
+
     return true;
 }
 
@@ -634,18 +649,14 @@ bool MasterComponent::isGraphOk() const {
 }
 
 void MasterComponent::updateHook() {
-
-    if (!master_service_->readBuffers()) {
-        return;
-        // TODO
-    }
-
     // What time is it
     RTT::os::TimeService::nsecs now = RTT::os::TimeService::Instance()->getNSecs();
     RTT::os::TimeService::Seconds
         time = RTT::nsecs_to_Seconds(now),
         period = RTT::nsecs_to_Seconds(RTT::os::TimeService::Instance()->getNSecs(last_update_time_));
-    
+
+    master_service_->readBuffers();
+
     // Store update time
     last_update_time_ = now;
       
@@ -654,7 +665,10 @@ void MasterComponent::updateHook() {
     last_exec_time_ = time;
 
     master_service_->initBuffersData(in_data_);
+
     master_service_->getBuffers(in_data_);
+//    Logger::log() << Logger::Info << "master component get buffers " << counter_ << Logger::endl;
+    counter_++;
 
     master_service_->writePorts(in_data_);
 

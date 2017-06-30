@@ -43,6 +43,7 @@ class MasterServiceRequester : public RTT::ServiceRequester {
  public:
   explicit MasterServiceRequester(RTT::TaskContext *owner)
     : RTT::ServiceRequester("master", owner)
+    , getIntervalInfo("getIntervalInfo")
     , initBuffersData("initBuffersData")
     , readBuffers("readBuffers")
     , getBuffers("getBuffers")
@@ -52,6 +53,7 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     , getUpperInputBuffers("getUpperInputBuffers")
     , getLowerOutputBuffers("getLowerOutputBuffers")
     , getUpperOutputBuffers("getUpperOutputBuffers")
+    , getBufferGroups("getBufferGroups")
     , getBehaviors("getBehaviors")
     , getStates("getStates")
     , getInitialState("getInitialState")
@@ -60,6 +62,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     , getPredicatesStr("getPredicatesStr")
     , iterationEnd("iterationEnd")
   {
+    this->addOperationCaller(getIntervalInfo);
+
     this->addOperationCaller(initBuffersData);
     this->addOperationCaller(readBuffers);
     this->addOperationCaller(getBuffers);
@@ -71,6 +75,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
     this->addOperationCaller(getLowerOutputBuffers);
     this->addOperationCaller(getUpperOutputBuffers);
 
+    this->addOperationCaller(getBufferGroups);
+
     this->addOperationCaller(getBehaviors);
     this->addOperationCaller(getStates);
     this->addOperationCaller(getInitialState);
@@ -81,6 +87,8 @@ class MasterServiceRequester : public RTT::ServiceRequester {
 
     this->addOperationCaller(iterationEnd);
   }
+
+  RTT::OperationCaller<bool(double&, double&, double&)> getIntervalInfo;
 
   // OROCOS ports operations
   RTT::OperationCaller<void (InputDataPtr&)> initBuffersData;
@@ -94,6 +102,9 @@ class MasterServiceRequester : public RTT::ServiceRequester {
   RTT::OperationCaller<void(std::vector<InputBufferInfo >&)> getUpperInputBuffers;
   RTT::OperationCaller<void(std::vector<OutputBufferInfo >&)> getLowerOutputBuffers;
   RTT::OperationCaller<void(std::vector<OutputBufferInfo >&)> getUpperOutputBuffers;
+
+  // buffer groups
+  RTT::OperationCaller<std::vector<std::vector<std::string > >() > getBufferGroups;
 
   // FSM parameters
   RTT::OperationCaller<std::vector<std::string >()> getBehaviors;
