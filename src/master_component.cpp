@@ -722,7 +722,10 @@ void MasterComponent::updateHook() {
         current_state_ = getState(next_state_name);
         if (!current_state_) {
             Logger::log() << Logger::Error << "could not switch to new state: " << next_state_name << Logger::endl;
+            diag_ss_rt_.addBehaviorSwitch(state_graphs_[current_state_->getStateName()], now, (err_cond?DiagBehaviorSwitch::ERROR:DiagBehaviorSwitch::STOP), predicate_list_);
+            diag_bs_sync_.Set(diag_ss_rt_);
             error();
+            return;
         }
         diag_ss_rt_.addBehaviorSwitch(state_graphs_[current_state_->getStateName()], now, (err_cond?DiagBehaviorSwitch::ERROR:DiagBehaviorSwitch::STOP), predicate_list_);
         diag_bs_sync_.Set(diag_ss_rt_);
