@@ -31,12 +31,15 @@
 #include <rtt/extras/SlaveActivity.hpp>
 #include <rtt/os/main.h>
 
+#include <rtt_rosclock/rtt_rosclock.h>
+
 #include <math.h>
 #include <algorithm>
 
 #include <vector>
 #include <set>
 #include <string>
+#include <pthread.h>
 
 #include "common_behavior/input_data.h"
 #include "common_behavior/master_service_requester.h"
@@ -193,6 +196,8 @@ public:
 
     bool addConmanScheme(RTT::TaskContext* scheme);
 
+    void setThreadName(const std::string& thread_name);
+
 private:
     BehaviorBasePtr getBehavior(const std::string& name) const;
     StateBasePtr getState(const std::string& name) const;
@@ -223,7 +228,7 @@ private:
     std::vector<TaskContext* > scheme_peers_;
     std::vector<const TaskContext* > scheme_peers_const_;
     std::set<std::string > switchable_components_;
-    std::vector<std::set<std::string > > running_components_in_behavior_;
+    std::vector<std::vector<bool > > is_running_in_behavior_;
 
     bool first_step_;
 
@@ -245,7 +250,20 @@ private:
     std::set<std::pair<std::string, std::string > > conflicting_components_;
 
     int counter_;
+
+    double interval1_;
+    double interval2_;
+    double interval3_;
+    double interval4_;
+    double interval5_;
+
+    std::string thread_name_;
 };
+
+void MasterComponent::setThreadName(const std::string& thread_name) {
+    thread_name_ = thread_name;
+    RTT::log(RTT::Info) << "master component thread name: " << thread_name_ << RTT::endlog();
+}
 
 MasterComponent::MasterComponent(const std::string &name)
     : TaskContext(name, PreOperational)
@@ -255,6 +273,8 @@ MasterComponent::MasterComponent(const std::string &name)
     this->addOperation("getDiag", &MasterComponent::getDiag, this, RTT::ClientThread);
 
     this->addOperation("addConmanScheme", &MasterComponent::addConmanScheme, this, RTT::ClientThread);
+
+    this->addOperation("setThreadName", &MasterComponent::setThreadName, this, RTT::ClientThread);
 
     addProperty("behavior_switch_history_length", behavior_switch_history_length_);
 }
@@ -299,6 +319,13 @@ std::string MasterComponent::getDiag() {
 
     strs << "<p>" << last_exec_period_ << "</p>";
     strs << "<t_tf>" << scheme_time_ << "</t_tf>";
+
+    strs << "<int1>" << interval1_ << "</int1>";
+    strs << "<int2>" << interval2_ << "</int2>";
+    strs << "<int3>" << interval3_ << "</int3>";
+    strs << "<int4>" << interval4_ << "</int4>";
+    strs << "<int5>" << interval5_ << "</int5>";
+
     strs << "</mcd>";
 
     return strs.str();
@@ -384,14 +411,6 @@ bool MasterComponent::configureHook() {
         RTT::log(RTT::Error) << "Unable to load common_behavior::MasterService" << RTT::endlog();
         return false;
     }
-
-//    use_interval_ = master_service_->getIntervalInfo(interval_min_, interval_first_, interval_next_);
-//    if (use_interval_) {
-//        RTT::log(RTT::Info) << "Using interval trigger method: min: " << interval_min_ << ", first: " << interval_first_ << ", next: " << interval_next_ << RTT::endlog();
-//    }
-//    else {
-//        RTT::log(RTT::Info) << "Not using interval trigger method" << RTT::endlog();
-//    }
 
     predicate_list_ = master_service_->allocatePredicateList();
     if (!predicate_list_) {
@@ -502,6 +521,7 @@ bool MasterComponent::configureHook() {
     hasBlock_ =  RTT::OperationCaller<bool(const std::string &)>(
         hasBlockOp, scheme_->engine());
 
+
     // get names of all components that are needed for all behaviors
     for (int i = 0; i < behaviors_.size(); ++i) {
         const std::vector<std::string >& comp_vec = behaviors_[i]->getRunningComponents();
@@ -509,8 +529,144 @@ bool MasterComponent::configureHook() {
             if (hasBlock_( comp_vec[j] )) {
                 switchable_components_.insert( comp_vec[j] );
             }
+            else {
+                Logger::log() << Logger::Error << "could not find a component \'" << comp_vec[j] << "\' in the scheme blocks list" << Logger::endl;
+                return false;
+            }
         }
     }
+
+    std::vector<std::string > all_converter_components;
+    std::vector<std::string > always_running_converter_components;
+
+    std::map<std::string, std::pair<std::string, std::string > > map_converters_components;
+
+    // get all converter components
+    for (int i = 0; i < scheme_peers_.size(); ++i) {
+        RTT::OperationInterfacePart *isDataConverterOp = scheme_peers_[i]->getOperation("isDataConverter");
+        if (!isDataConverterOp) {
+            continue;
+        }
+        RTT::OperationCaller<bool()> isDataConverter = RTT::OperationCaller<bool()>(isDataConverterOp);
+        if (isDataConverter()) {
+            const std::string& converter_name = scheme_peers_[i]->getName();
+            all_converter_components.push_back(converter_name);
+            Logger::log() << Logger::Info << "Found data converter component: " << converter_name << Logger::endl;
+
+            std::string comp_in;
+            std::string comp_out;
+
+            std::list<internal::ConnectionManager::ChannelDescriptor> chns = scheme_peers_[i]->getPort("data_INPORT")->getManager()->getConnections();
+            if (chns.empty()) {
+                Logger::log() << Logger::Error << "converter component is not connected (could not get channels): " << converter_name << Logger::endl;
+                return false;
+            }
+            for (std::list<internal::ConnectionManager::ChannelDescriptor>::iterator k = chns.begin(); k != chns.end(); k++){
+                base::ChannelElementBase::shared_ptr bs = k->get<1>();
+                if (bs->getInputEndPoint()->getPort() != 0){
+                    if (bs->getInputEndPoint()->getPort()->getInterface() != 0 ){
+                        comp_in = bs->getInputEndPoint()->getPort()->getInterface()->getOwner()->getName();
+                        break;
+/*                        std::map<std::string, std::vector<std::string > >::iterator m_it = map_components_converters.find(comp_in);
+                        if (m_it != map_components_converters.end()) {
+                            m_it->second.push_back( converter_name );
+
+                        }
+                        else {
+                            std::vector<std::string > vec;
+                            vec.push_back( converter_name );
+                            map_components_converters.insert( std::make_pair(comp_in, vec) );
+                        }
+                        if (switchable_components_.find(comp_in) == switchable_components_.end()) {
+                            always_running_converter_components.push_back(converter_name);
+                        }
+*/
+                    }
+                    else{
+                        Logger::log() << Logger::Error << "converter component is not connected (could not get interface): " << converter_name << Logger::endl;
+                        return false;
+                    }
+                }
+                else {
+                    Logger::log() << Logger::Error << "converter component is not connected (could not get port): " << converter_name << Logger::endl;
+                    return false;
+                }
+            }
+
+            chns = scheme_peers_[i]->getPort("data_OUTPORT")->getManager()->getConnections();
+            if (chns.empty()) {
+                Logger::log() << Logger::Error << "converter component is not connected (could not get channels): " << converter_name << Logger::endl;
+                return false;
+            }
+            for (std::list<internal::ConnectionManager::ChannelDescriptor>::iterator k = chns.begin(); k != chns.end(); k++){
+                base::ChannelElementBase::shared_ptr bs = k->get<1>();
+                if (bs->getOutputEndPoint()->getPort() != 0){
+                    if (bs->getOutputEndPoint()->getPort()->getInterface() != 0 ){
+                        comp_out = bs->getOutputEndPoint()->getPort()->getInterface()->getOwner()->getName();
+                        break;
+/*                        std::map<std::string, std::vector<std::string > >::iterator m_it = map_components_converters.find(comp_out);
+                        if (m_it != map_components_converters.end()) {
+                            m_it->second.push_back( converter_name );
+
+                        }
+                        else {
+                            std::vector<std::string > vec;
+                            vec.push_back( converter_name );
+                            map_components_converters.insert( std::make_pair(comp_out, vec) );
+                        }
+                        if (switchable_components_.find(comp_out) == switchable_components_.end()) {
+                            always_running_converter_components.push_back(converter_name);
+                        }
+*/
+                    }
+                    else{
+                        Logger::log() << Logger::Error << "converter component is not connected (could not get interface): " << converter_name << Logger::endl;
+                        return false;
+                    }
+                }
+                else {
+                    Logger::log() << Logger::Error << "converter component is not connected (could not get port): " << converter_name << Logger::endl;
+                    return false;
+                }
+            }
+
+            Logger::log() << Logger::Error << "converter '" << converter_name << "' connects components '" << comp_in << "' and '" << comp_out << "'" << Logger::endl;
+            map_converters_components.insert( std::make_pair(converter_name, std::make_pair(comp_in, comp_out)) );
+
+            if (switchable_components_.find(comp_in) == switchable_components_.end() && switchable_components_.find(comp_out) == switchable_components_.end()) {
+                always_running_converter_components.push_back(converter_name);
+            }
+        }
+    }
+
+    for (int i = 0; i < all_converter_components.size(); ++i) {
+        if (hasBlock_( all_converter_components[i] )) {
+            switchable_components_.insert( all_converter_components[i] );
+        }
+        else {
+            Logger::log() << Logger::Error << "could not find a component \'" << all_converter_components[i] << "\' in the scheme blocks list" << Logger::endl;
+            return false;
+        }
+    }
+
+/*
+    std::string switchable_converter_components_str;
+    for (int i = 0; i < switchable_converter_components.size(); ++i) {
+        if (hasBlock_( switchable_converter_components[i] )) {
+            switchable_components_.insert( switchable_converter_components[i] );
+            switchable_converter_components_str = switchable_converter_components_str + "'" + switchable_converter_components[i] + "', ";
+        }
+    }
+
+    Logger::log() << Logger::Error << "switchable converter components: " << switchable_converter_components_str << Logger::endl;
+
+    std::string always_running_converter_components_str;
+    for (int i = 0; i < always_running_converter_components.size(); ++i) {
+        switchable_components_.insert( always_running_converter_components[i] );
+        always_running_converter_components_str = always_running_converter_components_str + "'" + always_running_converter_components[i] + "', ";
+    }
+    Logger::log() << Logger::Error << "always running converter components: " << always_running_converter_components_str << Logger::endl;
+//*/
 
     std::string switchable_components_str;
     for (std::set<std::string >::const_iterator it = switchable_components_.begin(); it != switchable_components_.end(); ++it) {
@@ -544,22 +700,72 @@ bool MasterComponent::configureHook() {
 
     switchToConfiguration_ = RTT::OperationCaller<bool(int)>(
         switchToConfigurationOp, scheme_->engine());
-
+/*
+    for (std::map<std::string, std::vector<std::string > >::const_iterator it = map_components_converters.begin(); it != map_components_converters.end(); ++it) {
+        std::string converters;
+        for (int i = 0; i < it->second.size(); ++i) {
+            converters = converters + "'" + it->second[i] + "', ";
+        }
+        Logger::log() << Logger::Info << "component '" << it->first << "' outputs are connected to converters: " << converters << Logger::endl;
+        
+    }
+//*/
     Logger::log() << Logger::Info << "conman graph configurations:" << Logger::endl;
     for (int i = 0; i < states_.size(); ++i) {
         const std::vector<BehaviorBasePtr >& state_behaviors = state_behaviors_[states_[i]->getStateName()];
         std::vector<std::string > vec_running;
         for (int j = 0; j < state_behaviors.size(); ++j) {
-            const std::vector<std::string >& v = state_behaviors[j]->getRunningComponents();
+            const std::vector<std::string >& const_v = state_behaviors[j]->getRunningComponents();
+            std::vector<std::string > v = state_behaviors[j]->getRunningComponents();
+
+            for (std::map<std::string, std::pair<std::string, std::string > >::iterator it = map_converters_components.begin(); it != map_converters_components.end(); ++it) {
+                const std::string& comp_in = it->second.first;
+                const std::string& comp_out = it->second.second;
+                bool running_in = (std::find(const_v.begin(), const_v.end(), comp_in) != const_v.end());
+                bool running_out = (std::find(const_v.begin(), const_v.end(), comp_out) != const_v.end());
+                bool always_in = (std::find(always_running_converter_components.begin(), always_running_converter_components.end(), comp_in) != always_running_converter_components.end());
+                bool always_out = (std::find(always_running_converter_components.begin(), always_running_converter_components.end(), comp_out) != always_running_converter_components.end());
+//                if ((running_in && running_out) || (running_in && always_out) || (always_in && running_out)) {
+                if (running_in || always_in || running_out || always_out) {
+                    v.push_back(it->first);
+                }
+            }
+
+//            for (int k = 0; k < const_v.size(); ++k) {
+//                std::map<std::string, std::vector<std::string > >::iterator m_it = map_components_converters.find(const_v[k]);
+//                if (m_it != map_components_converters.end()) {
+//                    v.insert(v.end(), m_it->second.begin(), m_it->second.end());
+//                }
+//            }
+
+            v.insert(v.end(), always_running_converter_components.begin(), always_running_converter_components.end());
+            v.insert(v.end(), all_converter_components.begin(), all_converter_components.end());
+
             for (int k = 0; k < v.size(); ++k) {
                 if (std::find(vec_running.begin(), vec_running.end(), v[k]) == vec_running.end()) {
                     if (hasBlock_( v[k] )) {
                         vec_running.push_back(v[k]);
                     }
+                    else {
+                        Logger::log() << Logger::Error << "conman scheme has no block: " << v[k] << Logger::endl;
+                        return false;
+                    }
                 }
             }
         }
-        running_components_in_behavior_.push_back(std::set<std::string >(vec_running.begin(), vec_running.end()));
+
+        std::set<std::string > comp_beh_set = std::set<std::string >(vec_running.begin(), vec_running.end());
+        std::vector<bool > comp_beh_vec;
+        for (int j = 0; j < scheme_peers_const_.size(); ++j) {
+            const std::string& name = scheme_peers_const_[j]->getName();
+            if (comp_beh_set.find(name) != comp_beh_set.end() || switchable_components_.find(name) == switchable_components_.end()) {
+                comp_beh_vec.push_back(true);
+            }
+            else {
+                comp_beh_vec.push_back(false);
+            }
+        }
+        is_running_in_behavior_.push_back(comp_beh_vec);
 
         std::vector<std::string > vec_stopped;
         for (std::set<std::string >::const_iterator ic = switchable_components_.begin(); ic != switchable_components_.end(); ++ic) {
@@ -583,7 +789,7 @@ bool MasterComponent::configureHook() {
             str_running += vec_running[j] + ", ";
         }
 
-        Logger::log() << Logger::Info << i << "  s:[" << str_stopped << "], r:[" << str_running << "]" << Logger::endl;
+        Logger::log() << Logger::Info << i << " '" << states_[i]->getStateName() << "':  s:[" << str_stopped << "], r:[" << str_running << "]" << Logger::endl;
 
         addGraphConfiguration_(i, vec_stopped, vec_running);
         state_graphs_[states_[i]->getStateName()] = i;
@@ -603,11 +809,6 @@ bool MasterComponent::configureHook() {
 
 bool MasterComponent::startHook() {
     first_step_ = true;
-//    if (use_interval_) {
-//        arm_(0, interval_first_);
-//        use_interval_first_ = false;
-//    }
-
     return true;
 }
 
@@ -617,35 +818,37 @@ void MasterComponent::stopHook() {
 bool MasterComponent::isGraphOk() const {
 
     int current_graph_id = state_graphs_.find(current_state_->getStateName())->second;
+    const std::vector<bool >& beh_running_vec = is_running_in_behavior_[current_graph_id];
 
     for (int i = 0; i < scheme_peers_const_.size(); ++i) {
         const std::string& name = scheme_peers_const_[i]->getName();
         RTT::TaskContext::TaskState state = scheme_peers_const_[i]->getTaskState();
 
-        if (running_components_in_behavior_[current_graph_id].find(name) != running_components_in_behavior_[current_graph_id].end()) {
-            // switchable component that should be running in current behavior
+        if (beh_running_vec[i] && state != RTT::TaskContext::Running) {
+            Logger::log() << Logger::Error << "switchable component \'" << name << "\' should be running" << Logger::endl;
+            return false;
+        }
 
-            if (state != RTT::TaskContext::Running) {
-                Logger::log() << Logger::Error << "switchable component \'" << name << "\' should be running" << Logger::endl;
-                return false;
-            }
-        }
-        else if (switchable_components_.find(name) != switchable_components_.end()) {
-            // switchable component that should be stopped in current behavior
-            if (state != RTT::TaskContext::Stopped) {
-                Logger::log() << Logger::Error << "switchable component \'" << name << "\' should be stopped" << Logger::endl;
-                return false;
-            }
-        }
-        else {
-            // non-switchable component - should be runing in all behaviors
-            if (state != RTT::TaskContext::Running) {
-                Logger::log() << Logger::Error << "non-switchable component \'" << name << "\' should be running" << Logger::endl;
-                return false;
-            }
+        if (!beh_running_vec[i] && state != RTT::TaskContext::Stopped) {
+            Logger::log() << Logger::Error << "switchable component \'" << name << "\' should be stopped" << Logger::endl;
+            return false;
         }
     }
     return true;
+}
+
+static void timespec_diff(struct timespec *start, struct timespec *stop,
+                   struct timespec *result)
+{
+    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+    } else {
+        result->tv_sec = stop->tv_sec - start->tv_sec;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
+
+    return;
 }
 
 void MasterComponent::updateHook() {
@@ -655,19 +858,21 @@ void MasterComponent::updateHook() {
         time = RTT::nsecs_to_Seconds(now),
         period = RTT::nsecs_to_Seconds(RTT::os::TimeService::Instance()->getNSecs(last_update_time_));
 
+    ros::Time time1 = rtt_rosclock::rtt_wall_now();
+
     master_service_->readBuffers();
 
     // Store update time
     last_update_time_ = now;
-      
+
     // Compute statistics describing how often update is being called
     last_exec_period_ = time - last_exec_time_;
     last_exec_time_ = time;
 
+
     master_service_->initBuffersData(in_data_);
 
     master_service_->getBuffers(in_data_);
-//    Logger::log() << Logger::Info << "master component get buffers " << counter_ << Logger::endl;
     counter_++;
 
     master_service_->writePorts(in_data_);
@@ -690,9 +895,6 @@ void MasterComponent::updateHook() {
     master_service_->calculatePredicates(in_data_, scheme_peers_const_, predicate_list_);
     predicate_list_->CURRENT_BEHAVIOR_OK = graphOk;
 
-//    Logger::log() << Logger::Info << "current state: " << current_state_->getStateName()
-//        << Logger::endl;
-
     const std::vector<BehaviorBasePtr >& current_behaviors = state_behaviors_[current_state_->getStateName()];
     bool err_cond = false;
     for (int i = 0; i < current_behaviors.size(); ++i) {
@@ -714,6 +916,7 @@ void MasterComponent::updateHook() {
     }
 
     predicate_list_->IN_ERROR = err_cond;
+    ros::Time time2 = rtt_rosclock::rtt_wall_now();
 
     if (stop_cond || err_cond) {
         const std::string& next_state_name = current_state_->getNextState(predicate_list_);
@@ -732,6 +935,7 @@ void MasterComponent::updateHook() {
 
         behavior_switch = true;
     }
+    ros::Time time3 = rtt_rosclock::rtt_wall_now();
 
     //
     // if the behavior has changed, reorganize the graph
@@ -746,12 +950,15 @@ void MasterComponent::updateHook() {
             return;
         }
     }
+    ros::Time time4 = rtt_rosclock::rtt_wall_now();
 
     if (scheme_->getTaskState() != RTT::TaskContext::Running) {
         RTT::log(RTT::Error) << "Component is not in the running state: " << scheme_->getName() << RTT::endlog();
         error();
         return;
     }
+
+    ros::Time time5 = rtt_rosclock::rtt_wall_now();
 
     RTT::os::TimeService::nsecs time_1 = RTT::os::TimeService::Instance()->getNSecs();
     scheme_->update();
@@ -761,14 +968,34 @@ void MasterComponent::updateHook() {
 
     // iterationEnd callback can be used by e.g. Gazebo simulator
     master_service_->iterationEnd();
-/*
-// TODO: determine if this is needed here
-    master_service_->initBuffersData(in_data_);
-    if (!master_service_->readStatusPorts(in_data_)) {
-        error();
+
+    ros::Time time6 = rtt_rosclock::rtt_wall_now();
+
+    double interval1 = (time2-time1).toSec();
+    double interval2 = (time3-time2).toSec();
+    double interval3 = (time4-time3).toSec();
+    double interval4 = (time5-time4).toSec();
+    double interval5 = (time6-time5).toSec();
+
+    if (interval1 > interval1_ || counter_%5000 == 0) {
+        interval1_ = interval1;
     }
-    master_service_->writeStatusPorts(in_data_);
-*/
+
+    if (interval2 > interval2_ || counter_%5000 == 0) {
+        interval2_ = interval2;
+    }
+
+    if (interval3 > interval3_ || counter_%5000 == 0) {
+        interval3_ = interval3;
+    }
+
+    if (interval4 > interval4_ || counter_%5000 == 0) {
+        interval4_ = interval4;
+    }
+
+    if (interval5 > interval5_ || counter_%5000 == 0) {
+        interval5_ = interval5;
+    }
 }
 
 ORO_LIST_COMPONENT_TYPE(MasterComponent)

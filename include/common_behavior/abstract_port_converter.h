@@ -67,15 +67,24 @@ public:
     explicit ConverterComponent(const std::string &name)
         : RTT::TaskContext(name)
         , port_in_("data_INPORT")
-        , port_out_("data_OUTPORT")
+        , port_out_("data_OUTPORT", false)
         , converter_(new C())
     {
-        ports()->addPort(port_in_);
-        ports()->addPort(port_out_);
+        ports()->addLocalPort(port_in_);
+        ports()->addLocalPort(port_out_);
+        this->addOperation("isDataConverter", &ConverterComponent::isDataConverter, this, RTT::ClientThread);
+    }
+
+    bool isDataConverter() const {
+        return true;
+    }
+
+    void stopHook() {
+        port_out_.clear();
     }
 
     void updateHook() {
-        if (port_in_.read(in_) == RTT::NewData) {
+        if (port_in_.read(in_, false) == RTT::NewData) {
             converter_->convert(in_, out_);
             port_out_.write(out_);
         }
